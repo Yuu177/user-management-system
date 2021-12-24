@@ -1,13 +1,23 @@
 package geerpc
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"mySql/dao"
 	"net/http"
 	"token/tokenUtil"
+
+	"github.com/jinzhu/gorm"
 )
+
+type User struct {
+	Name     string
+	Nickname string
+	Password string
+	Picture  string
+}
 
 type debugLogin struct{}
 
@@ -25,14 +35,9 @@ func (server *debugLogin) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 type debugUserProfile struct{}
 
-type userProfile struct {
-	Name string
-	Pwd  string
-}
-
 func (server *debugUserProfile) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// 解析指定文件生成模板对象
-	tmpl, err := template.ParseFiles("/Users/tpy/codeTest/userSystem/rpc/tmpl/user_profile.tmpl")
+	tmpl, err := template.ParseFiles("/Users/tpy/codeTest/userSystem/rpc/tmpl/user.tmpl")
 	if err != nil {
 		fmt.Println("create template failed, err:", err)
 		return
@@ -43,7 +48,7 @@ func (server *debugUserProfile) ServeHTTP(w http.ResponseWriter, req *http.Reque
 	if err == nil {
 		userName, err := tokenUtil.GetValueByToken(c.Value)
 		if err == nil {
-			tmpl.Execute(w, &userProfile{Name: userName, Pwd: "is have token"})
+			tmpl.Execute(w, &User{Name: userName, Password: "is have token"})
 			return
 		}
 		log.Println("redis token not exist: ", c.Value)
@@ -53,7 +58,7 @@ func (server *debugUserProfile) ServeHTTP(w http.ResponseWriter, req *http.Reque
 
 	name := req.FormValue("name")
 	pwd := req.FormValue("pwd")
-	user := &userProfile{Name: name, Pwd: pwd}
+	user := &User{Name: name, Password: pwd}
 	log.Println("get user: ", user)
 	token := tokenUtil.GenerateToken(name)
 	tokenUtil.SaveToken(token, name) // redis, key: token, value: userName
@@ -64,31 +69,53 @@ func (server *debugUserProfile) ServeHTTP(w http.ResponseWriter, req *http.Reque
 	tmpl.Execute(w, user)
 }
 
-type UserInfo struct {
-	Name     string
-	Nickname string
-	Password string
-	Picture  string
-}
-
 var db = dao.GetDB()
 
-func insert(info *UserInfo) {
+func insert(info *User) {
 	db.Create(info)
 }
 
-func update(info *UserInfo) {
+func update(info *User) {
 	db.Save(info)
 }
 
-func selectByUserName(name string) UserInfo {
-	var info UserInfo
-	db.Find(&info, "name=?", name)
-	return info
+func selectUserByName(name string) (User, error) {
+	var user User
+	err := db.Where("name  = ?", name).First(&user)
+
+	// if errors.Is(err, gorm.ErrRecordNotFound) {
+	// 	log.Println("not found", name)
+	// } else if err != nil {
+	// 	log.Println("select error", err)
+	// }
+
+	return user, err
 }
 
 type registUser struct{}
 
 func (server *registUser) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	
+	name := req.FormValue("name")
+	nickname := req.FormValue("nickname")
+	password := req.FormValue("password")
+	picture := req.FormValue("picture")
+
+	var user = &User{
+		Name:     name,
+		Nickname: nickname,
+		Password: password,
+		Picture:  picture,
+	}
+
+	// 判断用户是否存在
+	_, err := selectUserByName(user.Name)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Println("not found", name)
+		insert(user)
+	} else if err != nil {
+		log.Println("select error, please try later", err)
+	} else {
+		log.Println("username is exist, please change name")
+	}
+
 }

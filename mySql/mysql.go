@@ -1,21 +1,25 @@
-package dao
+package mysql
 
 import (
 	"fmt"
 	"log"
-	"report/src/config"
 	"time"
 
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"gorm.io/gorm"
 )
+
+type User struct {
+	UserName    string
+	NickName    string
+	Password    string
+	PicturePath string // 保存用户头像路径
+}
 
 // db连接
 var db *gorm.DB
 
-// setup 初始化连接
 func setup() {
 	conn, err := gorm.Open("mysql", "user:user@(127.0.0.1:3306)/testdb01?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
@@ -31,8 +35,7 @@ func setup() {
 	db = conn
 }
 
-// GetDB 开放给外部获得db连接
-func GetDB() *gorm.DB {
+func getDB() *gorm.DB {
 	sqlDB, err := db.DB()
 	if err != nil {
 		fmt.Errorf("connect db server failed.")
@@ -43,4 +46,29 @@ func GetDB() *gorm.DB {
 		setup()
 	}
 	return db
+}
+
+func init() {
+	db = getDb()
+	db.AutoMigrate(&User{})
+}
+
+// 创建一个账号
+func CreateAccount(user *User) error {
+	err := db.Create(&user)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+// 登陆验证
+func LoginAuth(userName string, password string) (bool, error) {
+	var user User
+	db.Where("UserName = ?", userName).First(&user)
+	pwd := utils.Sha256(password)
+	if user.Password == pwd {
+		return true, nil
+	}
+	return false, nil
 }

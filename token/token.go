@@ -1,10 +1,10 @@
-package tokenUtil
+package token
 
 import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	redisUtil "geerpc/redis"
+	redis "geerpc/redis"
 	"math/rand"
 	"time"
 )
@@ -40,9 +40,9 @@ func GenerateToken(userName string) string {
 
 func SaveToken(token, value string) {
 	var exp time.Duration = 10 * time.Second
-	redisUtil.Set(token, value, exp) // 暂时设置秒
+	redis.Set(token, value, exp) // 暂时设置秒
 }
 
 func GetValueByToken(token string) (string, error) {
-	return redisUtil.Get(token)
+	return redis.Get(token)
 }

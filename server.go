@@ -229,11 +229,11 @@ func (server *Server) Register(rcvr interface{}) error {
 func Register(rcvr interface{}) error { return DefaultServer.Register(rcvr) }
 
 const (
-	connected                   = "200 Connected to Gee RPC"
-	defaultRPCPath              = "/_geeprc_"
-	defaultDebugPath            = "/debug/geerpc"
-	defaultDebugLoginPath       = "/debug/login"
-	defaultDebugUserProfilePath = "/debug/user_profile"
+	connected             = "200 Connected to Gee RPC"
+	defaultRPCPath        = "/_geeprc_"
+	defaultDebugPath      = "/debug/geerpc"
+	defaultDebugLoginPath = "/debug/login"
+	defaultDebugUserPath  = "/debug/user"
 )
 
 // ServeHTTP implements an http.Handler that answers RPC requests.
@@ -264,7 +264,7 @@ func (server *Server) HandleHTTP() {
 	http.Handle(defaultRPCPath, server)
 	http.Handle(defaultDebugPath, debugHTTP{server})
 	http.Handle(defaultDebugLoginPath, &debugLogin{})
-	http.Handle(defaultDebugUserProfilePath, &debugUserProfile{})
+	http.Handle(defaultDebugUserPath, &debugUserProfile{})
 	log.Println("rpc server debug path:", defaultDebugPath)
 }
 

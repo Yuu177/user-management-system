@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"geerpc"
 	"log"
 	"net"
@@ -41,7 +40,7 @@ func call(addrCh chan string) {
 			defer wg.Done()
 			args := &Args{Num1: i, Num2: i * i}
 			var reply int
-			if err := client.Call(context.Background(), "Foo.Sum", args, &reply); err != nil {
+			if err := client.Call("Foo.Sum", args, &reply); err != nil {
 				log.Fatal("call Foo.Sum error:", err)
 			}
 			log.Printf("%d + %d = %d", args.Num1, args.Num2, reply)
