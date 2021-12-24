@@ -1,27 +1,30 @@
 package main
 
 import (
+	"geerpc"
+	"geerpc/config"
+	"geerpc/mysql"
+	"geerpc/protocol"
 	"geerpc/token"
-	"usermana/config"
-	"usermana/log"
-	"usermana/mysql"
-	"usermana/protocol"
-	"usermana/redis"
-	"usermana/rpc"
+	"log"
+	"net"
 )
 
 func main() {
-	//init server.
-	server := rpc.Server()
+	var u user
 	//注册服务.
-	panicIfErr(server.Register("SignUp", SignUp, SignUpService))
-	panicIfErr(server.Register("Login", Login, LoginService))
+	panicIfErr(geerpc.Register(&u)) //注册 user 的所有方法. like: user.loginAuth()
 	// panicIfErr(server.Register("GetProfile", GetProfile, GetProfileService))
 	// panicIfErr(server.Register("UpdateProfilePic", UpdateProfilePic, UpdateProfilePicService))
 	// panicIfErr(server.Register("UpdateNickName", UpdateNickName, UpdateNickNameService))
 
 	//监听并且处理连接.
-	server.ListenAndServe(config.TCPServerAddr)
+	l, err := net.Listen("tcp", config.TCPServerAddr)
+	if err != nil {
+		log.Fatal("network error:", err)
+	}
+
+	geerpc.Accept(l)
 }
 
 // panicIfErr 错误包裹函数.
@@ -31,13 +34,15 @@ func panicIfErr(err error) {
 	}
 }
 
+type user struct{}
+
 // SignUp 注册接口.
-func SignUp(v interface{}) interface{} {
-	return SignUpService(*v.(*protocol.ReqSignUp))
+func (u *user) SignUp(v interface{}) interface{} {
+	return SignUpService(*v.(*protocol.User))
 }
 
 // Login 登录接口.
-func Login(v interface{}) interface{} {
+func (u *user) Login(v interface{}) interface{} {
 	return LoginService(*v.(*protocol.ReqLogin))
 }
 
@@ -57,23 +62,18 @@ func Login(v interface{}) interface{} {
 // }
 
 // SignUpService 注册接口的实际服务，同时用于在注册时向rpc传递参数类型.
-func SignUpService(arg protocol.ReqSignUp) (reply protocol.RespSignUp) {
-	if arg.UserName == "" || arg.Password == "" {
+func SignUpService(user protocol.User) (reply protocol.RespSignUp) {
+	if user.UserName == "" || user.Password == "" {
 		reply.Ret = 1
 		return
 	}
-	if arg.NickName == "" {
-		arg.NickName = arg.UserName
+	if user.NickName == "" {
+		user.NickName = user.UserName
 	}
 
-	if err := mysql.CreateAccount(arg.UserName, arg.Password); err != nil {
+	if err := mysql.CreateAccount(&user); err != nil {
 		reply.Ret = 2
-		log.Errorf("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q", arg.UserName, err)
-		return
-	}
-	if err := mysql.CreateProfile(arg.UserName, arg.NickName); err != nil {
-		reply.Ret = 2
-		log.Errorf("tcp.signUp: mysql.CreateProfile failed. usernam:%s, err:%q", arg.UserName, err)
+		log.Fatal("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q", arg.UserName, err)
 		return
 	}
 
@@ -86,7 +86,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 	ok, err := mysql.LoginAuth(arg.UserName, arg.Password)
 	if err != nil {
 		reply.Ret = 2
-		log.Errorf("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q", arg.UserName, err)
+		log.Fatal("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q", arg.UserName, err)
 		return
 	}
 	//账号或密码不正确.
@@ -98,7 +98,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 	err = redis.SetToken(arg.UserName, token, int64(config.TokenMaxExTime))
 	if err != nil {
 		reply.Ret = 2
-		log.Errorf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q", arg.UserName, token, err)
+		log.Fatal("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q", arg.UserName, token, err)
 		return
 	}
 	reply.Ret = 0
@@ -113,7 +113,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	ok, err := checkToken(arg.UserName, arg.Token)
 // 	if err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
+// 		log.Fatal("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
 // 		return
 // 	}
 // 	if !ok {
@@ -125,7 +125,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	nickName, picName, hasData, err := redis.GetProfile(arg.UserName)
 // 	if err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.getProfile: redis.GetProfile failed. username:%s, err:%q", arg.UserName, err)
+// 		log.Fatal("tcp.getProfile: redis.GetProfile failed. username:%s, err:%q", arg.UserName, err)
 // 		return
 // 	}
 // 	if hasData {
@@ -137,7 +137,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	nickName, picName, hasData, err = mysql.GetProfile(arg.UserName)
 // 	if err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q", arg.UserName, err)
+// 		log.Fatal("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q", arg.UserName, err)
 // 		return
 // 	}
 // 	if hasData {
@@ -145,7 +145,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 		redis.SetNickNameAndPicName(arg.UserName, nickName, picName)
 // 	} else {
 // 		reply.Ret = 2
-// 		log.Errorf("tcp.getProfile: mysql.GetProfile can't find username. username:%s", arg.UserName)
+// 		log.Fatal("tcp.getProfile: mysql.GetProfile can't find username. username:%s", arg.UserName)
 // 		return
 // 	}
 // 	log.Infof("tcp.getProfile done. username:%s", arg.UserName)
@@ -159,7 +159,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	ok, err := checkToken(arg.UserName, arg.Token)
 // 	if err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
+// 		log.Fatal("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
 // 		return
 // 	}
 // 	if !ok {
@@ -170,14 +170,14 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	// 使redis对应的数据失效（由于数据将会被修改）.
 // 	if err := redis.InvaildCache(arg.UserName); err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.updateProfilePic: redis.InvaildCache failed. username:%s, err:%q", arg.UserName, err)
+// 		log.Fatal("tcp.updateProfilePic: redis.InvaildCache failed. username:%s, err:%q", arg.UserName, err)
 // 		return
 // 	}
 // 	// 写入数据库.
 // 	ok, err = mysql.UpdateProfilePic(arg.UserName, arg.FileName)
 // 	if err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q", arg.UserName, arg.FileName, err)
+// 		log.Fatal("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q", arg.UserName, arg.FileName, err)
 // 		return
 // 	}
 // 	if !ok {
@@ -195,7 +195,7 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	ok, err := checkToken(arg.UserName, arg.Token)
 // 	if err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
+// 		log.Fatal("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
 // 		return
 // 	}
 // 	if !ok {
@@ -205,14 +205,14 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	// 使redis对应的数据失效（由于数据将会被修改）.
 // 	if err := redis.InvaildCache(arg.UserName); err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.updateNickName: redis.InvaildCache failed. username:%s, err:%q", arg.UserName, err)
+// 		log.Fatal("tcp.updateNickName: redis.InvaildCache failed. username:%s, err:%q", arg.UserName, err)
 // 		return
 // 	}
 // 	// 写入数据库.
 // 	ok, err = mysql.UpdateNikcName(arg.UserName, arg.NickName)
 // 	if err != nil {
 // 		reply.Ret = 3
-// 		log.Errorf("tcp.updateNickName: mysql.UpdateNikcName failed. username:%s, nickname:%s, err:%q", arg.UserName, arg.NickName, err)
+// 		log.Fatal("tcp.updateNickName: mysql.UpdateNikcName failed. username:%s, nickname:%s, err:%q", arg.UserName, arg.NickName, err)
 // 		return
 // 	}
 // 	if !ok {

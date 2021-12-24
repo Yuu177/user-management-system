@@ -2,6 +2,8 @@ package mysql
 
 import (
 	"fmt"
+	"geerpc/protocol"
+	"geerpc/utils"
 	"log"
 	"time"
 
@@ -9,13 +11,6 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"gorm.io/gorm"
 )
-
-type User struct {
-	UserName    string
-	NickName    string
-	Password    string
-	PicturePath string // 保存用户头像路径
-}
 
 // db连接
 var db *gorm.DB
@@ -27,7 +22,7 @@ func setup() {
 	}
 	sqlDB, err := conn.DB()
 	if err != nil {
-		fmt.Error("connect db server failed.")
+		fmt.Println("connect db server failed.")
 	}
 	sqlDB.SetMaxIdleConns(10)                   // sets the maximum number of connections in the idle connection pool.
 	sqlDB.SetMaxOpenConns(100)                  // sets the maximum number of open connections to the database.
@@ -49,12 +44,12 @@ func getDB() *gorm.DB {
 }
 
 func init() {
-	db = getDb()
-	db.AutoMigrate(&User{})
+	db = getDB()
+	db.AutoMigrate(&protocol.User{})
 }
 
 // 创建一个账号
-func CreateAccount(user *User) error {
+func CreateAccount(user *protocol.User) error {
 	err := db.Create(&user)
 	if err != nil {
 		return err
@@ -64,7 +59,7 @@ func CreateAccount(user *User) error {
 
 // 登陆验证
 func LoginAuth(userName string, password string) (bool, error) {
-	var user User
+	var user protocol.User
 	db.Where("UserName = ?", userName).First(&user)
 	pwd := utils.Sha256(password)
 	if user.Password == pwd {

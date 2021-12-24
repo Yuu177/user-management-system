@@ -61,3 +61,10 @@ type ReqUpdateNickName struct {
 type RespUpdateNickName struct {
 	Ret int `json:"ret"` // 结果码 0:成功 1:token校验失败 2:用户不存在 3:更新失败
 }
+
+type User struct {
+	UserName    string
+	NickName    string
+	Password    string
+	PicturePath string // 保存用户头像路径
+}
