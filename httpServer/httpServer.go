@@ -1,12 +1,12 @@
 package main
 
 import (
-	"config"
 	"fmt"
 	"geerpc"
+	"geerpc/config"
+	"geerpc/protocol"
 	"log"
 	"net/http"
-	"protocol"
 	"text/template"
 )
 
@@ -37,14 +37,14 @@ var rpcClient *geerpc.Client
 // init 提前解析html文件.程序用到即可直接使用，避免多次解析.
 func init() {
 	loginTemplate = template.Must(template.ParseFiles("../templates/login.html"))
-	profileTemplate = template.Must(template.ParseFiles("../templates/user.html"))
+	profileTemplate = template.Must(template.ParseFiles("../templates/profile.html"))
 	jumpTemplate = template.Must(template.ParseFiles("../templates/jump.html"))
 }
 
 func main() {
 	//初始化rpc客户端并且连接rpc服务器.
 	var err error
-	rpcClient, err := geerpc.Dial("tcp", config.TCPServerAddr)
+	rpcClient, err = geerpc.Dial("tcp", config.TCPServerAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +53,7 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(config.StaticFilePath))))
 
 	//安装http请求对应的处理函数.
-	// http.HandleFunc("/", GetProfile)
+	http.HandleFunc("/", GetProfile)
 	http.HandleFunc("/signUp", SignUp)
 	http.HandleFunc("/login", Login)
 	// http.HandleFunc("/profile", GetProfile)
@@ -85,8 +85,8 @@ func SignUp(rw http.ResponseWriter, req *http.Request) {
 		}
 		reply := protocol.RespSignUp{}
 		//调用远程rpc服务, 将数据存入到数据库.
-		if err := rpcClient.Call("SignUp", arg, &reply); err != nil {
-			log.Fatal("http.SignUp: Call SignUp failed. username:%s, err:%q", userName, err)
+		if err := rpcClient.Call("UserServices.SignUp", arg, &reply); err != nil {
+			log.Printf("http.SignUp: Call SignUp failed. username:%s, err:%q\n", userName, err)
 			rw.Write([]byte("创建账号失败！"))
 			return
 		}
@@ -99,12 +99,13 @@ func SignUp(rw http.ResponseWriter, req *http.Request) {
 		default:
 			rw.Write([]byte("创建账号失败！"))
 		}
-		log.Fatal("http.SignUp: SignUp done. username:%s, ret:%d", userName, reply.Ret)
+		log.Printf("http.SignUp: SignUp done. username:%s, ret:%d\n", userName, reply.Ret)
 	}
 }
 
 // Login 登录接口.
 func Login(rw http.ResponseWriter, req *http.Request) {
+	// templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
 	if req.Method == "POST" {
 		userName := req.FormValue("username")
 		password := req.FormValue("password")
@@ -121,8 +122,8 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 		}
 		reply := protocol.RespLogin{}
 		//调用远程rpc服务, 主要对登陆账号密码进行验证.
-		if err := rpcClient.Call("Login", arg, &reply); err != nil {
-			log.Fatal("http.Login: Call Login failed. username:%s, err:%q", userName, err)
+		if err := rpcClient.Call("UserServices.Login", arg, &reply); err != nil {
+			log.Printf("http.Login: Call Login failed. username:%s, err:%q\n", userName, err)
 			// 重新登录.
 			templateLogin(rw, LoginResponse{Msg: "登录失败！"})
 			return
@@ -142,64 +143,64 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 		default:
 			templateLogin(rw, LoginResponse{Msg: "登录失败！"})
 		}
-		log.Fatal("http.Login: Login done. username:%s, ret:%d", userName, reply.Ret)
+		log.Printf("http.Login: Login done. username:%s, ret:%d\n", userName, reply.Ret)
 	}
 }
 
-// // GetProfile 获得用户信息.
-// func GetProfile(rw http.ResponseWriter, req *http.Request) {
-// 	if req.Method == "GET" {
-// 		// 获取token, 没有token则重新登陆.
-// 		token, err := req.Cookie("token")
-// 		if err != nil {
-// 			log.Fatal("http.GetProfile: Call GetProfile failed.")
-// 			templateLogin(rw, LoginResponse{Msg: ""})
-// 			return
-// 		}
+// GetProfile 获得用户信息.
+func GetProfile(rw http.ResponseWriter, req *http.Request) {
+	if req.Method == "GET" {
+		// 获取token, 没有token则重新登陆.
+		token, err := req.Cookie("token")
+		if err != nil {
+			log.Printf("tpy:http.GetProfile: Call GetProfile failed.")
+			templateLogin(rw, LoginResponse{Msg: ""})
+			return
+		}
 
-// 		// 获取用户名，如果为空从cookie获取.
-// 		userName := req.FormValue("username")
-// 		if userName == "" {
-// 			nameCookie, err := req.Cookie("username")
-// 			if err != nil {
-// 				templateLogin(rw, LoginResponse{Msg: ""})
-// 				return
-// 			}
-// 			userName = nameCookie.Value
-// 		}
+		// 获取用户名，如果为空从cookie获取.
+		userName := req.FormValue("username")
+		if userName == "" {
+			nameCookie, err := req.Cookie("username")
+			if err != nil {
+				templateLogin(rw, LoginResponse{Msg: ""})
+				return
+			}
+			userName = nameCookie.Value
+		}
 
-// 		arg := protocol.ReqGetProfile{
-// 			UserName: userName,
-// 			Token:    token.Value,
-// 		}
-// 		reply := protocol.RespGetProfile{}
-// 		//调用远程rpc服务, 获取用户对应的信息.
-// 		if err := rpcClient.Call("GetProfile", arg, &reply); err != nil {
-// 			log.Fatal("http.GetProfile: Call GetProfile failed. username:%s, err:%q", userName, err)
-// 			templateJump(rw, JumpResponse{Msg: "获取用户信息失败！"})
-// 			return
-// 		}
+		arg := protocol.ReqGetProfile{
+			UserName: userName,
+			Token:    token.Value,
+		}
+		reply := protocol.RespGetProfile{}
+		//调用远程rpc服务, 获取用户对应的信息.
+		if err := rpcClient.Call("UserServices.GetProfile", arg, &reply); err != nil {
+			log.Printf("http.GetProfile: Call GetProfile failed. username:%s, err:%q\n", userName, err)
+			templateJump(rw, JumpResponse{Msg: "获取用户信息失败！"})
+			return
+		}
 
-// 		switch reply.Ret {
-// 		case 0:
-// 			if reply.PicName == "" {
-// 				reply.PicName = config.DefaultImagePath
-// 			}
-// 			//将用户的信息返回给对应的用户.
-// 			templateProfile(rw, ProfileResponse{
-// 				UserName: reply.UserName,
-// 				NickName: reply.NickName,
-// 				PicName:  reply.PicName})
-// 		case 1:
-// 			templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
-// 		case 2:
-// 			templateJump(rw, JumpResponse{Msg: "用户不存在！"})
-// 		default:
-// 			templateJump(rw, JumpResponse{Msg: "获取用户信息失败！"})
-// 		}
-// 		log.Fatal("http.GetProfile: GetProfile done. username:%s, ret:%d", userName, reply.Ret)
-// 	}
-// }
+		switch reply.Ret {
+		case 0:
+			if reply.PicName == "" {
+				reply.PicName = config.DefaultImagePath
+			}
+			//将用户的信息返回给对应的用户.
+			templateProfile(rw, ProfileResponse{
+				UserName: reply.UserName,
+				NickName: reply.NickName,
+				PicName:  reply.PicName})
+		case 1:
+			templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
+		case 2:
+			templateJump(rw, JumpResponse{Msg: "用户不存在！"})
+		default:
+			templateJump(rw, JumpResponse{Msg: "获取用户信息失败！"})
+		}
+		log.Printf("http.GetProfile: GetProfile done. username:%s, ret:%d\n", userName, reply.Ret)
+	}
+}
 
 // // UpdateNickName 更新昵称.
 // func UpdateNickName(rw http.ResponseWriter, req *http.Request) {
@@ -207,7 +208,7 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 // 		// 获取token, 没有token则重新登陆.
 // 		token, err := req.Cookie("token")
 // 		if err != nil {
-// 			log.Fatal("http.UpdateNickName: get token failed. err:%q", err)
+// 			log.Printf("http.UpdateNickName: get token failed. err:%q", err)
 // 			templateLogin(rw, LoginResponse{})
 // 			return
 // 		}
@@ -222,7 +223,7 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 // 		reply := protocol.RespUpdateNickName{}
 // 		//调用远程rpc服务, 修改用户的nickName信息.
 // 		if err := rpcClient.Call("UpdateNickName", arg, &reply); err != nil {
-// 			log.Fatal("http.UpdateNickName: Call UpdateNickName failed. username:%s, err:%q", userName, err)
+// 			log.Printf("http.UpdateNickName: Call UpdateNickName failed. username:%s, err:%q", userName, err)
 // 			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
 // 			return
 // 		}
@@ -238,7 +239,7 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 // 			templateJump(rw, JumpResponse{Msg: "修改昵称失败！"})
 
 // 		}
-// 		log.Fatal("http.UpdateNickName: UpdateNickName done. username:%s, nickname:%s, ret:%d", userName, nickName, reply.Ret)
+// 		log.Printf("http.UpdateNickName: UpdateNickName done. username:%s, nickname:%s, ret:%d", userName, nickName, reply.Ret)
 
 // 	}
 // }
@@ -249,7 +250,7 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 // 		// 获取token, 没有token则重新登陆.
 // 		token, err := req.Cookie("token")
 // 		if err != nil {
-// 			log.Fatal("http.UploadProfilePicture: get token failed. err:%q", err)
+// 			log.Printf("http.UploadProfilePicture: get token failed. err:%q", err)
 // 			templateLogin(rw, LoginResponse{})
 // 			return
 // 		}
@@ -258,7 +259,7 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 // 		file, head, err := req.FormFile("image")
 // 		if err != nil {
 // 			templateJump(rw, JumpResponse{Msg: "获取图片失败！"})
-// 			log.Fatal("http.UploadProfilePicture: get file name failed. username:%s, err:%q", userName, err)
+// 			log.Printf("http.UploadProfilePicture: get file name failed. username:%s, err:%q", userName, err)
 // 			return
 // 		}
 // 		defer file.Close()
@@ -287,7 +288,7 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 // 		reply := protocol.RespUpdateProfilePic{}
 // 		//调用远程rpc服务, 修改用户的头像pickName的路径
 // 		if err := rpcClient.Call("UpdateProfilePic", arg, &reply); err != nil {
-// 			log.Fatal("http.UploadProfilePicture: Call UploadProfilePic failed. username:%s, err:%q", userName, err)
+// 			log.Printf("http.UploadProfilePicture: Call UploadProfilePic failed. username:%s, err:%q", userName, err)
 // 			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
 // 			return
 // 		}
@@ -302,27 +303,27 @@ func Login(rw http.ResponseWriter, req *http.Request) {
 // 		default:
 // 			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
 // 		}
-// 		log.Fatal("http.UploadProfilePicture: UploadProfilePicture done. username:%s, filepath:%s, ret:%d", userName, serverPath, reply.Ret)
+// 		log.Printf("http.UploadProfilePicture: UploadProfilePicture done. username:%s, filepath:%s, ret:%d", userName, serverPath, reply.Ret)
 // 	}
 // }
 
 //http 登陆页面.
 func templateLogin(rw http.ResponseWriter, reply LoginResponse) {
 	if err := loginTemplate.Execute(rw, reply); err != nil {
-		log.Fatal("http.templateLogin: %q", err)
+		log.Printf("http.templateLogin: %q\n", err)
 	}
 }
 
 //http 编辑页面.
 func templateProfile(rw http.ResponseWriter, reply ProfileResponse) {
 	if err := profileTemplate.Execute(rw, reply); err != nil {
-		log.Fatal("http.templateProfile: %q", err)
+		log.Printf("http.templateProfile: %q\n", err)
 	}
 }
 
 //http 应答信息页面.
 func templateJump(rw http.ResponseWriter, reply JumpResponse) {
 	if err := jumpTemplate.Execute(rw, reply); err != nil {
-		log.Fatal("http.templateJump: %q", err)
+		log.Printf("http.templateJump: %q\n", err)
 	}
 }

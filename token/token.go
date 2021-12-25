@@ -38,11 +38,19 @@ func GenerateToken(userName string) string {
 	return md5V(token)
 }
 
-func SaveToken(token, value string) {
-	var exp time.Duration = 10 * time.Second
-	redis.Set(token, value, exp) // 暂时设置秒
+func SaveToken(token string, value string, exp int64) error {
+	return redis.Set(token, value, exp)
 }
 
-func GetValueByToken(token string) (string, error) {
-	return redis.Get(token)
+func CheckToken(input string, token string) (bool, error) {
+	val, err := redis.Get(token)
+	if err != nil {
+		return false, err
+	}
+
+	if input == val {
+		return true, nil
+	}
+
+	return false, nil
 }

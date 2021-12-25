@@ -23,18 +23,24 @@ const (
 	// TCPServerLogPath TCP服务日志.
 	TCPServerLogPath string = "./log/tcp_server.log"
 	// TCPServerAddr tcp server ip:port.
-	TCPServerAddr string = ":3194"
+	TCPServerAddr string = "[::]:3194"
 	// TCPClientPoolSize 客户端tcp连接池大小.
 	TCPClientPoolSize int = 2000
 
 	// HTTPServerLogPath HTTP服务日志.
 	HTTPServerLogPath string = "./log/http_server.log"
 	// HTTPServerAddr HTTP服务地址.
-	HTTPServerAddr string = ":1088"
+	HTTPServerAddr string = "[::]:1088"
 
 	// StaticFilePath http静态文件服务地址.
 	StaticFilePath string = "../static/"
 
 	// DefaultImagePath 默认头像.
 	DefaultImagePath string = "andy.jpeg"
+
+	// DatabaseSettingUser string
+	// DatabaseSettingPassword,
+	// DatabaseSettingHost,
+	// DatabaseSettingPort,
+	// DatabaseSettingName
 )

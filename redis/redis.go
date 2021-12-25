@@ -12,6 +12,8 @@ import (
 var rdb *redis.Client
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Llongfile) // 暂时在这里初始化 log
+
 	initClient()
 }
 
@@ -32,8 +34,8 @@ func initClient() (err error) {
 }
 
 // expire 失效时间。0 是永久
-func Set(key string, value interface{}, expiration time.Duration) error { // 这里 value 还是换成 string 好一点感觉。因为这里反正存的是string
-	err := rdb.Set(key, value, expiration).Err()
+func Set(key string, value interface{}, expiration int64) error { // 这里 value 还是换成 string 好一点感觉。因为这里反正存的是string
+	err := rdb.Set(key, value, time.Duration(expiration*1e9)).Err()
 	if err != nil {
 		log.Println("RedisSet Error! key:", key, "Details:", err.Error())
 		return err

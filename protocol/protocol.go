@@ -63,8 +63,8 @@ type RespUpdateNickName struct {
 }
 
 type User struct {
-	UserName    string
-	NickName    string
-	Password    string
-	PicturePath string // 保存用户头像路径
+	UserName string
+	NickName string
+	Password string
+	PicName  string // 用户头像文件名名称
 }

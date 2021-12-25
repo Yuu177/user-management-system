@@ -45,8 +45,7 @@ func GenerateToken(userName string) string {
 	return MD5(token)
 }
 
-func SaveToken(token, value string) {
-	var exp time.Duration = 10 * time.Second
+func SaveToken(token, value string, exp int64) {
 	redis.Set(token, value, exp) // 暂时设置秒
 }
 

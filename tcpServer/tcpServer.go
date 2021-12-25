@@ -11,9 +11,9 @@ import (
 )
 
 func main() {
-	var u user
+	var services UserServices
 	//注册服务.
-	panicIfErr(geerpc.Register(&u)) //注册 user 的所有方法. like: user.loginAuth()
+	panicIfErr(geerpc.Register(&services)) //注册 user 的所有方法. like: user.loginAuth()
 	// panicIfErr(server.Register("GetProfile", GetProfile, GetProfileService))
 	// panicIfErr(server.Register("UpdateProfilePic", UpdateProfilePic, UpdateProfilePicService))
 	// panicIfErr(server.Register("UpdateNickName", UpdateNickName, UpdateNickNameService))
@@ -34,124 +34,79 @@ func panicIfErr(err error) {
 	}
 }
 
-type user struct{}
-
-// SignUp 注册接口.
-func (u *user) SignUp(v interface{}) interface{} {
-	return SignUpService(*v.(*protocol.User))
-}
-
-// Login 登录接口.
-func (u *user) Login(v interface{}) interface{} {
-	return LoginService(*v.(*protocol.ReqLogin))
-}
-
-// // GetProfile 获取信息接口.
-// func GetProfile(v interface{}) interface{} {
-// 	return GetProfileService(*v.(*protocol.ReqGetProfile))
-// }
-
-// // UpdateProfilePic 更新头像接口.
-// func UpdateProfilePic(v interface{}) interface{} {
-// 	return UpdateProfilePicService(*v.(*protocol.ReqUpdateProfilePic))
-// }
-
-// // UpdateNickName 更新昵称接口
-// func UpdateNickName(v interface{}) interface{} {
-// 	return UpdateNickNameService(*v.(*protocol.ReqUpdateNickName))
-// }
+type UserServices struct{}
 
 // SignUpService 注册接口的实际服务，同时用于在注册时向rpc传递参数类型.
-func SignUpService(user protocol.User) (reply protocol.RespSignUp) {
-	if user.UserName == "" || user.Password == "" {
+func (s *UserServices) SignUp(arg protocol.User, reply *protocol.RespSignUp) error {
+	if arg.UserName == "" || arg.Password == "" {
 		reply.Ret = 1
-		return
+		return nil
 	}
-	if user.NickName == "" {
-		user.NickName = user.UserName
+	if arg.NickName == "" {
+		arg.NickName = arg.UserName
 	}
 
-	if err := mysql.CreateAccount(&user); err != nil {
+	if err := mysql.CreateAccount(&arg); err != nil {
 		reply.Ret = 2
-		log.Fatal("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q", arg.UserName, err)
-		return
+		log.Printf("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q\n", arg.UserName, err)
+		return nil
 	}
 
 	reply.Ret = 0
-	return
+	return nil
 }
 
 // LoginService 登录接口的实际服务，同时用于在注册时向rpc传递参数类型.
-func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
+func (s *UserServices) Login(arg protocol.ReqLogin, reply *protocol.RespLogin) error {
 	ok, err := mysql.LoginAuth(arg.UserName, arg.Password)
 	if err != nil {
 		reply.Ret = 2
-		log.Fatal("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q", arg.UserName, err)
-		return
+		log.Printf("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q\n", arg.UserName, err)
+		return nil
 	}
 	//账号或密码不正确.
 	if !ok {
 		reply.Ret = 1
-		return
+		return nil
 	}
-	token := token.GenerateToken(arg.UserName)
-	err = redis.SetToken(arg.UserName, token, int64(config.TokenMaxExTime))
+	t := token.GenerateToken(arg.UserName)
+	err = token.SaveToken(t, arg.UserName, int64(config.TokenMaxExTime))
 	if err != nil {
 		reply.Ret = 2
-		log.Fatal("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q", arg.UserName, token, err)
-		return
+		log.Printf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q\n", arg.UserName, t, err)
+		return nil
 	}
 	reply.Ret = 0
-	reply.Token = token
-	log.Infof("tcp.login: login done. username:%s", arg.UserName)
-	return
+	reply.Token = t
+	log.Printf("tcp.login: login done. username:%s\n", arg.UserName)
+	return nil
 }
 
-// // GetProfileService 获取信息接口的实际服务，同时用于在注册时向rpc传递参数类型.
-// func GetProfileService(arg protocol.ReqGetProfile) (reply protocol.RespGetProfile) {
-// 	// 校验token
-// 	ok, err := checkToken(arg.UserName, arg.Token)
-// 	if err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
-// 		return
-// 	}
-// 	if !ok {
-// 		reply.Ret = 1
-// 		return
-// 	}
+// GetProfileService 获取信息接口的实际服务，同时用于在注册时向rpc传递参数类型.
+func GetProfileService(arg protocol.ReqGetProfile) (reply protocol.RespGetProfile) {
+	// 校验token
+	ok, err := checkToken(arg.UserName, arg.Token)
+	if err != nil {
+		reply.Ret = 3
+		log.Printf("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q\n", arg.UserName, arg.Token, err)
+		return
+	}
+	if !ok {
+		reply.Ret = 1
+		return
+	}
 
-// 	// 先尝试从redis取数据.
-// 	nickName, picName, hasData, err := redis.GetProfile(arg.UserName)
-// 	if err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.getProfile: redis.GetProfile failed. username:%s, err:%q", arg.UserName, err)
-// 		return
-// 	}
-// 	if hasData {
-// 		log.Infof("redis tcp.getProfile done. username:%s", arg.UserName)
-// 		return protocol.RespGetProfile{Ret: 0, UserName: arg.UserName, NickName: nickName, PicName: picName}
-// 	}
+	//redis没有数据，从mysql里取.
+	user, err := mysql.GetProfile(arg.UserName)
+	if err != nil {
+		reply.Ret = 3
+		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q\n", arg.UserName, err)
+		return
+	}
+	log.Printf("tcp.getProfile done. username:%s\n", arg.UserName)
+	return protocol.RespGetProfile{Ret: 0, UserName: user.UserName, NickName: user.NickName, PicName: user.PicName}
 
-// 	//redis没有数据，从mysql里取.
-// 	nickName, picName, hasData, err = mysql.GetProfile(arg.UserName)
-// 	if err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q", arg.UserName, err)
-// 		return
-// 	}
-// 	if hasData {
-// 		// 向redis插入数据.
-// 		redis.SetNickNameAndPicName(arg.UserName, nickName, picName)
-// 	} else {
-// 		reply.Ret = 2
-// 		log.Fatal("tcp.getProfile: mysql.GetProfile can't find username. username:%s", arg.UserName)
-// 		return
-// 	}
-// 	log.Infof("tcp.getProfile done. username:%s", arg.UserName)
-// 	return protocol.RespGetProfile{Ret: 0, UserName: arg.UserName, NickName: nickName, PicName: picName}
-
-// }
+}
 
 // // UpdateProfilePicService 更新头像接口的实际服务(picName/FileName)，同时用于在注册时向rpc传递参数类型.
 // func UpdateProfilePicService(arg protocol.ReqUpdateProfilePic) (reply protocol.RespUpdateProfilePic) {
@@ -224,11 +179,11 @@ func LoginService(arg protocol.ReqLogin) (reply protocol.RespLogin) {
 // 	return
 // }
 
-//checkToken  检查Token
-func checkToken(userName string, token string) (bool, error) {
+// checkToken  检查Token
+func checkToken(userName string, tk string) (bool, error) {
 	// 压测token
-	if token == "test" {
+	if tk == "test" {
 		return true, nil
 	}
-	return redis.CheckToken(userName, token)
+	return token.CheckToken(userName, tk)
 }
