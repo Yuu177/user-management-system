@@ -10,7 +10,7 @@
         <form action="/uploadFile" method="POST" enctype="multipart/form-data">
             <input type="text" name="username" value="{{ .UserName }}" readonly="readonly" hidden="hidden" />
             <img src="/static/{{ .PicName }}" height="100" width="100">
-            <p><input type="file" name="image" accept="image/gif, image/jpeg" /></p> 
+            <p><input type="file" name="image" accept="image/gif, image/jpeg" /></p>
             <p><input type="submit" name="change_btn" value="Change"></p>
         </form>
         <form action="/updateNickName" method="POST">

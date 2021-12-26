@@ -64,6 +64,7 @@ func GetDB() *gorm.DB {
 
 // 创建一个账号
 func CreateAccount(user *protocol.User) error {
+	user.Password = utils.Sha256(user.Password)
 	if err := db.Create(&user).Error; err != nil {
 		fmt.Println("插入失败", err)
 		return err
@@ -74,7 +75,7 @@ func CreateAccount(user *protocol.User) error {
 // 登陆验证
 func LoginAuth(userName string, password string) (bool, error) {
 	var user protocol.User
-	db.Where("UserName = ?", userName).First(&user)
+	db.Where("user_name = ?", userName).First(&user)
 	pwd := utils.Sha256(password)
 	if user.Password == pwd {
 		return true, nil
@@ -85,9 +86,29 @@ func LoginAuth(userName string, password string) (bool, error) {
 // GetProfile 获取用户信息.
 func GetProfile(userName string) (protocol.User, error) {
 	var user protocol.User
-	err := db.Where("UserName = ?", userName).First(&user).Error
+	err := db.Where("user_name = ?", userName).First(&user).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return protocol.User{}, err
 	}
 	return user, nil
+}
+
+func UpdateNickName(userName, nickName string) (bool, error) {
+	u := protocol.User{}
+	// 更新用户表的密码
+	// UPDATE `users` SET `nick_name` = 'nickName' WHERE (user_name = 'userName')
+	err := db.Model(&u).Where("user_name = ?", userName).Update("nick_name", nickName).Error
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func UpdateProfilePic(userName, picName string) (bool, error) {
+	u := protocol.User{}
+	err := db.Model(&u).Where("user_name = ?", userName).Update("pic_name", picName).Error
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

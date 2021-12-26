@@ -183,7 +183,8 @@ func (client *Client) Go(serviceMethod string, args, reply interface{}, done cha
 // Call invokes the named function, waits for it to complete,
 // and returns its error status.
 func (client *Client) Call(serviceMethod string, args, reply interface{}) error {
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	call := client.Go(serviceMethod, args, reply, make(chan *Call, 1))
 	// 取消函数：当cancel被调用时,context.WithTimeout设置的时间超过后,关闭ctx.Done通道；
 	// cancel()

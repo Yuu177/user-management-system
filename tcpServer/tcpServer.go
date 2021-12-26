@@ -21,7 +21,7 @@ func main() {
 	//监听并且处理连接.
 	l, err := net.Listen("tcp", config.TCPServerAddr)
 	if err != nil {
-		log.Fatal("network error:", err)
+		log.Printf("network error:", err)
 	}
 
 	geerpc.Accept(l)
@@ -58,6 +58,7 @@ func (s *UserServices) SignUp(arg protocol.User, reply *protocol.RespSignUp) err
 
 // LoginService 登录接口的实际服务，同时用于在注册时向rpc传递参数类型.
 func (s *UserServices) Login(arg protocol.ReqLogin, reply *protocol.RespLogin) error {
+	log.Println("tpy...login")
 	ok, err := mysql.LoginAuth(arg.UserName, arg.Password)
 	if err != nil {
 		reply.Ret = 2
@@ -83,101 +84,97 @@ func (s *UserServices) Login(arg protocol.ReqLogin, reply *protocol.RespLogin) e
 }
 
 // GetProfileService 获取信息接口的实际服务，同时用于在注册时向rpc传递参数类型.
-func GetProfileService(arg protocol.ReqGetProfile) (reply protocol.RespGetProfile) {
+func (s *UserServices) GetProfile(arg protocol.ReqGetProfile, reply *protocol.RespGetProfile) error {
 	// 校验token
 	ok, err := checkToken(arg.UserName, arg.Token)
 	if err != nil {
 		reply.Ret = 3
 		log.Printf("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q\n", arg.UserName, arg.Token, err)
-		return
+		return err
 	}
 	if !ok {
 		reply.Ret = 1
-		return
+		return err
 	}
 
-	//redis没有数据，从mysql里取.
 	user, err := mysql.GetProfile(arg.UserName)
 	if err != nil {
 		reply.Ret = 3
-		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q\n", arg.UserName, err)
-		return
+		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q\n", user.UserName, err)
+		return err
 	}
-	log.Printf("tcp.getProfile done. username:%s\n", arg.UserName)
-	return protocol.RespGetProfile{Ret: 0, UserName: user.UserName, NickName: user.NickName, PicName: user.PicName}
+
+	log.Printf("tcp.getProfile done. username:%s\n", user.UserName)
+	reply.Ret = 0
+	reply.UserName = user.UserName
+	reply.NickName = user.NickName
+	reply.PicName = user.PicName
+	// 下面这种是错误的
+	// reply = &protocol.RespGetProfile{Ret: 0, UserName: user.UserName, NickName: user.NickName, PicName: user.PicName}
+	log.Println(reply)
+	return nil
 
 }
 
-// // UpdateProfilePicService 更新头像接口的实际服务(picName/FileName)，同时用于在注册时向rpc传递参数类型.
-// func UpdateProfilePicService(arg protocol.ReqUpdateProfilePic) (reply protocol.RespUpdateProfilePic) {
-// 	// 校验token.
-// 	ok, err := checkToken(arg.UserName, arg.Token)
-// 	if err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
-// 		return
-// 	}
-// 	if !ok {
-// 		reply.Ret = 1
-// 		return
-// 	}
+// UpdateProfilePicService 更新头像接口的实际服务(picName/FileName)，同时用于在注册时向rpc传递参数类型.
+func (s *UserServices) UpdateProfilePic(arg protocol.ReqUpdateProfilePic, reply *protocol.RespUpdateProfilePic) error {
+	// 校验token.
+	ok, err := checkToken(arg.UserName, arg.Token)
+	if err != nil {
+		reply.Ret = 3
+		log.Printf("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
+		return err
+	}
+	if !ok {
+		reply.Ret = 1
+		return err
+	}
 
-// 	// 使redis对应的数据失效（由于数据将会被修改）.
-// 	if err := redis.InvaildCache(arg.UserName); err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.updateProfilePic: redis.InvaildCache failed. username:%s, err:%q", arg.UserName, err)
-// 		return
-// 	}
-// 	// 写入数据库.
-// 	ok, err = mysql.UpdateProfilePic(arg.UserName, arg.FileName)
-// 	if err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q", arg.UserName, arg.FileName, err)
-// 		return
-// 	}
-// 	if !ok {
-// 		reply.Ret = 2
-// 		return
-// 	}
-// 	reply.Ret = 0
-// 	log.Infof("tcp.updateProfilePic done. username:%s, filename:%s", arg.UserName, arg.FileName)
-// 	return
-// }
+	// 写入数据库.
+	ok, err = mysql.UpdateProfilePic(arg.UserName, arg.FileName)
+	if err != nil {
+		reply.Ret = 3
+		log.Printf("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q", arg.UserName, arg.FileName, err)
+		return err
+	}
+	if !ok {
+		reply.Ret = 2
+		return err
+	}
+	reply.Ret = 0
+	log.Printf("tcp.updateProfilePic done. username:%s, filename:%s", arg.UserName, arg.FileName)
+	return nil
+}
 
-// // UpdateNickNameService 更新昵称接口的实际服务(NickName)，同时用于在注册时向rpc传递参数类型.
-// func UpdateNickNameService(arg protocol.ReqUpdateNickName) (reply protocol.RespUpdateNickName) {
-// 	// 校验token.
-// 	ok, err := checkToken(arg.UserName, arg.Token)
-// 	if err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
-// 		return
-// 	}
-// 	if !ok {
-// 		reply.Ret = 1
-// 		return
-// 	}
-// 	// 使redis对应的数据失效（由于数据将会被修改）.
-// 	if err := redis.InvaildCache(arg.UserName); err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.updateNickName: redis.InvaildCache failed. username:%s, err:%q", arg.UserName, err)
-// 		return
-// 	}
-// 	// 写入数据库.
-// 	ok, err = mysql.UpdateNikcName(arg.UserName, arg.NickName)
-// 	if err != nil {
-// 		reply.Ret = 3
-// 		log.Fatal("tcp.updateNickName: mysql.UpdateNikcName failed. username:%s, nickname:%s, err:%q", arg.UserName, arg.NickName, err)
-// 		return
-// 	}
-// 	if !ok {
-// 		reply.Ret = 2
-// 		return
-// 	}
-// 	reply.Ret = 0
-// 	log.Infof("tcp.updateNickName done. username:%s, nickname:%s", arg.UserName, arg.NickName)
-// 	return
-// }
+// UpdateNickNameService 更新昵称接口的实际服务(NickName)，同时用于在注册时向rpc传递参数类型.
+func (s *UserServices) UpdateNickName(arg protocol.ReqUpdateNickName, reply *protocol.RespUpdateNickName) error {
+	// 校验token.
+	ok, err := checkToken(arg.UserName, arg.Token)
+	if err != nil {
+		reply.Ret = 3
+		log.Printf("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q\n", arg.UserName, arg.Token, err)
+		return err
+	}
+	if !ok {
+		reply.Ret = 1
+		return err
+	}
+
+	// 写入数据库.
+	ok, err = mysql.UpdateNickName(arg.UserName, arg.NickName)
+	if err != nil {
+		reply.Ret = 3
+		log.Printf("tcp.updateNickName: mysql.UpdateNickName failed. username:%s, nickname:%s, err:%q\n", arg.UserName, arg.NickName, err)
+		return err
+	}
+	if !ok {
+		reply.Ret = 2
+		return err
+	}
+	reply.Ret = 0
+	log.Printf("tcp.updateNickName done. username:%s, nickname:%s\n", arg.UserName, arg.NickName)
+	return nil
+}
 
 // checkToken  检查Token
 func checkToken(userName string, tk string) (bool, error) {

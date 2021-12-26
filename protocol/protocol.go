@@ -63,8 +63,8 @@ type RespUpdateNickName struct {
 }
 
 type User struct {
-	UserName string
-	NickName string
-	Password string
-	PicName  string // 用户头像文件名名称
+	UserName string `gorm:"column:user_name;primary_key"` // 设置自动生成表的表名
+	NickName string `gorm:"column:nick_name"`
+	Password string `gorm:"column:password;not null"`
+	PicName  string `gorm:"column:pic_name"` // 用户头像文件名名称
 }

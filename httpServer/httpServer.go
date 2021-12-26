@@ -5,8 +5,11 @@ import (
 	"geerpc"
 	"geerpc/config"
 	"geerpc/protocol"
+	"geerpc/utils"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"text/template"
 )
 
@@ -39,6 +42,7 @@ func init() {
 	loginTemplate = template.Must(template.ParseFiles("../templates/login.html"))
 	profileTemplate = template.Must(template.ParseFiles("../templates/profile.html"))
 	jumpTemplate = template.Must(template.ParseFiles("../templates/jump.html"))
+	log.SetFlags(log.LstdFlags | log.Llongfile) // 暂时在这里初始化 log
 }
 
 func main() {
@@ -57,8 +61,8 @@ func main() {
 	http.HandleFunc("/signUp", SignUp)
 	http.HandleFunc("/login", Login)
 	// http.HandleFunc("/profile", GetProfile)
-	// http.HandleFunc("/updateNickName", UpdateNickName)
-	// http.HandleFunc("/uploadFile", UploadProfilePicture)
+	http.HandleFunc("/updateNickName", UpdateNickName)
+	http.HandleFunc("/uploadFile", UploadProfilePicture)
 
 	//开启http server监听.
 	http.ListenAndServe(config.HTTPServerAddr, nil)
@@ -77,7 +81,7 @@ func SignUp(rw http.ResponseWriter, req *http.Request) {
 			rw.Write([]byte("Username and password couldn't be NULL!"))
 			return
 		}
-		fmt.Printf("userName = %s, password = %s,nickName = %s\n", userName, password, nickName)
+		fmt.Printf("userName = %s, password = %s, nickName = %s\n", userName, password, nickName)
 		arg := protocol.ReqSignUp{
 			UserName: userName,
 			Password: password,
@@ -153,7 +157,7 @@ func GetProfile(rw http.ResponseWriter, req *http.Request) {
 		// 获取token, 没有token则重新登陆.
 		token, err := req.Cookie("token")
 		if err != nil {
-			log.Printf("tpy:http.GetProfile: Call GetProfile failed.")
+			log.Printf("http.GetProfile: Call GetProfile failed.")
 			templateLogin(rw, LoginResponse{Msg: ""})
 			return
 		}
@@ -186,6 +190,7 @@ func GetProfile(rw http.ResponseWriter, req *http.Request) {
 			if reply.PicName == "" {
 				reply.PicName = config.DefaultImagePath
 			}
+			log.Println(reply)
 			//将用户的信息返回给对应的用户.
 			templateProfile(rw, ProfileResponse{
 				UserName: reply.UserName,
@@ -202,110 +207,116 @@ func GetProfile(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// // UpdateNickName 更新昵称.
-// func UpdateNickName(rw http.ResponseWriter, req *http.Request) {
-// 	if req.Method == "POST" {
-// 		// 获取token, 没有token则重新登陆.
-// 		token, err := req.Cookie("token")
-// 		if err != nil {
-// 			log.Printf("http.UpdateNickName: get token failed. err:%q", err)
-// 			templateLogin(rw, LoginResponse{})
-// 			return
-// 		}
-// 		userName := req.FormValue("username")
-// 		nickName := req.FormValue("nickname")
+// UpdateNickName 更新昵称.
+func UpdateNickName(rw http.ResponseWriter, req *http.Request) {
+	if req.Method == "POST" {
+		// 获取token, 没有token则重新登陆.
+		token, err := req.Cookie("token")
+		if err != nil {
+			log.Printf("http.UpdateNickName: get token failed. err:%q", err)
+			templateLogin(rw, LoginResponse{})
+			return
+		}
+		userName := req.FormValue("username")
+		nickName := req.FormValue("nickname")
 
-// 		arg := protocol.ReqUpdateNickName{
-// 			UserName: userName,
-// 			NickName: nickName,
-// 			Token:    token.Value,
-// 		}
-// 		reply := protocol.RespUpdateNickName{}
-// 		//调用远程rpc服务, 修改用户的nickName信息.
-// 		if err := rpcClient.Call("UpdateNickName", arg, &reply); err != nil {
-// 			log.Printf("http.UpdateNickName: Call UpdateNickName failed. username:%s, err:%q", userName, err)
-// 			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
-// 			return
-// 		}
+		arg := protocol.ReqUpdateNickName{
+			UserName: userName,
+			NickName: nickName,
+			Token:    token.Value,
+		}
+		reply := protocol.RespUpdateNickName{}
+		//调用远程rpc服务, 修改用户的nickName信息.
+		if err := rpcClient.Call("UserServices.UpdateNickName", arg, &reply); err != nil {
+			log.Printf("http.UpdateNickName: Call UpdateNickName failed. username:%s, err:%q", userName, err)
+			templateJump(rw, JumpResponse{Msg: "修改昵称失败！"})
+			return
+		}
 
-// 		switch reply.Ret {
-// 		case 0:
-// 			templateJump(rw, JumpResponse{Msg: "修改昵称成功！"})
-// 		case 1:
-// 			templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
-// 		case 2:
-// 			templateJump(rw, JumpResponse{Msg: "用户不存在！"})
-// 		default:
-// 			templateJump(rw, JumpResponse{Msg: "修改昵称失败！"})
+		switch reply.Ret {
+		case 0:
+			templateJump(rw, JumpResponse{Msg: "修改昵称成功！"})
+		case 1:
+			templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
+		case 2:
+			templateJump(rw, JumpResponse{Msg: "用户不存在！"})
+		default:
+			templateJump(rw, JumpResponse{Msg: "修改昵称失败！"})
 
-// 		}
-// 		log.Printf("http.UpdateNickName: UpdateNickName done. username:%s, nickname:%s, ret:%d", userName, nickName, reply.Ret)
+		}
+		log.Printf("http.UpdateNickName: UpdateNickName done. username:%s, nickname:%s, ret:%d", userName, nickName, reply.Ret)
 
-// 	}
-// }
+	}
+}
 
-// // UploadProfilePicture 上传并更新头像.
-// func UploadProfilePicture(rw http.ResponseWriter, req *http.Request) {
-// 	if req.Method == "POST" {
-// 		// 获取token, 没有token则重新登陆.
-// 		token, err := req.Cookie("token")
-// 		if err != nil {
-// 			log.Printf("http.UploadProfilePicture: get token failed. err:%q", err)
-// 			templateLogin(rw, LoginResponse{})
-// 			return
-// 		}
-// 		userName := req.FormValue("username")
-// 		//获取图片文件.
-// 		file, head, err := req.FormFile("image")
-// 		if err != nil {
-// 			templateJump(rw, JumpResponse{Msg: "获取图片失败！"})
-// 			log.Printf("http.UploadProfilePicture: get file name failed. username:%s, err:%q", userName, err)
-// 			return
-// 		}
-// 		defer file.Close()
-// 		//检测文件合法性，并且随机生成一个文件名，拷贝newName.
-// 		newName, isLegal := utils.CheckAndCreateFileName(head.Filename)
-// 		if !isLegal {
-// 			templateJump(rw, JumpResponse{Msg: "文件格式不合法！"})
-// 			return
-// 		}
-// 		filePath := config.StaticFilePath + newName
-// 		serverPath := newName
-// 		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
-// 		defer dstFile.Close()
-// 		//拷贝文件.
-// 		_, err = io.Copy(dstFile, file)
-// 		if err != nil {
-// 			templateJump(rw, JumpResponse{Msg: "文件拷贝出错！"})
-// 			return
-// 		}
+// UploadProfilePicture 上传并更新头像.
+func UploadProfilePicture(rw http.ResponseWriter, req *http.Request) {
+	if req.Method == "POST" {
+		// 获取token, 没有token则重新登陆.
+		token, err := req.Cookie("token")
+		if err != nil {
+			log.Printf("http.UploadProfilePicture: get token failed. err:%q", err)
+			templateLogin(rw, LoginResponse{})
+			return
+		}
+		userName := req.FormValue("username")
+		//获取图片文件.
+		file, head, err := req.FormFile("image")
+		if err != nil {
+			templateJump(rw, JumpResponse{Msg: "获取图片失败！"})
+			log.Printf("http.UploadProfilePicture: get file name failed. username:%s, err:%q", userName, err)
+			return
+		}
+		defer file.Close()
+		//检测文件合法性，并且随机生成一个文件名，拷贝newName.
+		newName, isLegal := utils.CheckAndCreateFileName(head.Filename)
+		if !isLegal {
+			templateJump(rw, JumpResponse{Msg: "文件格式不合法！"})
+			return
+		}
+		filePath := config.StaticFilePath + newName
+		fileName := newName
 
-// 		arg := protocol.ReqUpdateProfilePic{
-// 			UserName: userName,
-// 			FileName: serverPath,
-// 			Token:    token.Value,
-// 		}
-// 		reply := protocol.RespUpdateProfilePic{}
-// 		//调用远程rpc服务, 修改用户的头像pickName的路径
-// 		if err := rpcClient.Call("UpdateProfilePic", arg, &reply); err != nil {
-// 			log.Printf("http.UploadProfilePicture: Call UploadProfilePic failed. username:%s, err:%q", userName, err)
-// 			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
-// 			return
-// 		}
+		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
+		if err != nil {
+			templateJump(rw, JumpResponse{Msg: "文件打开出错！"})
+			return
+		}
+		defer dstFile.Close()
 
-// 		switch reply.Ret {
-// 		case 0:
-// 			templateJump(rw, JumpResponse{Msg: "修改头像成功！"})
-// 		case 1:
-// 			templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
-// 		case 2:
-// 			templateJump(rw, JumpResponse{Msg: "用户不存在！"})
-// 		default:
-// 			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
-// 		}
-// 		log.Printf("http.UploadProfilePicture: UploadProfilePicture done. username:%s, filepath:%s, ret:%d", userName, serverPath, reply.Ret)
-// 	}
-// }
+		//拷贝文件。拷贝上传的文件到 static 文件夹中
+		_, err = io.Copy(dstFile, file)
+		if err != nil {
+			templateJump(rw, JumpResponse{Msg: "文件拷贝出错！"})
+			return
+		}
+
+		arg := protocol.ReqUpdateProfilePic{
+			UserName: userName,
+			FileName: fileName,
+			Token:    token.Value,
+		}
+		reply := protocol.RespUpdateProfilePic{}
+		//调用远程rpc服务, 修改用户的头像pickName的路径
+		if err = rpcClient.Call("UserServices.UpdateProfilePic", arg, &reply); err != nil {
+			log.Printf("http.UploadProfilePicture: Call UploadProfilePic failed. username:%s, err:%q", userName, err)
+			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
+			return
+		}
+
+		switch reply.Ret {
+		case 0:
+			templateJump(rw, JumpResponse{Msg: "修改头像成功！"})
+		case 1:
+			templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
+		case 2:
+			templateJump(rw, JumpResponse{Msg: "用户不存在！"})
+		default:
+			templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
+		}
+		log.Printf("http.UploadProfilePicture: UploadProfilePicture done. username:%s, filepath:%s, ret:%d", userName, fileName, reply.Ret)
+	}
+}
 
 //http 登陆页面.
 func templateLogin(rw http.ResponseWriter, reply LoginResponse) {
