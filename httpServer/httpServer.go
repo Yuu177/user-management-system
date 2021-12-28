@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"geerpc"
 	"geerpc/config"
 	"geerpc/protocol"
+	"geerpc/rpc"
 	"geerpc/utils"
 	"io"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"text/template"
 )
@@ -35,7 +36,7 @@ type JumpResponse struct {
 	Msg string
 }
 
-var rpcClient *geerpc.Client
+var rpcClient rpc.RPCClient
 
 // init 提前解析html文件.程序用到即可直接使用，避免多次解析.
 func init() {
@@ -48,7 +49,7 @@ func init() {
 func main() {
 	//初始化rpc客户端并且连接rpc服务器.
 	var err error
-	rpcClient, err = geerpc.Dial("tcp", config.TCPServerAddr)
+	rpcClient, err = rpc.Client(config.TCPClientPoolSize, config.TCPServerAddr)
 	if err != nil {
 		panic(err)
 	}

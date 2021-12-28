@@ -1,30 +1,33 @@
 package main
 
 import (
-	"geerpc"
 	"geerpc/config"
 	"geerpc/mysql"
 	"geerpc/protocol"
+	"geerpc/rpc"
 	"geerpc/token"
 	"log"
-	"net"
 )
 
 func main() {
 	var services UserServices
-	//注册服务.
-	panicIfErr(geerpc.Register(&services)) //注册 user 的所有方法. like: user.loginAuth()
-	// panicIfErr(server.Register("GetProfile", GetProfile, GetProfileService))
-	// panicIfErr(server.Register("UpdateProfilePic", UpdateProfilePic, UpdateProfilePicService))
-	// panicIfErr(server.Register("UpdateNickName", UpdateNickName, UpdateNickNameService))
+	// //注册服务.
+	// panicIfErr(geerpc.Register(&services)) //注册 user 的所有方法. like: user.loginAuth()
+	// // panicIfErr(server.Register("GetProfile", GetProfile, GetProfileService))
+	// // panicIfErr(server.Register("UpdateProfilePic", UpdateProfilePic, UpdateProfilePicService))
+	// // panicIfErr(server.Register("UpdateNickName", UpdateNickName, UpdateNickNameService))
 
-	//监听并且处理连接.
-	l, err := net.Listen("tcp", config.TCPServerAddr)
-	if err != nil {
-		log.Printf("network error:", err)
-	}
+	// //监听并且处理连接.
+	// l, err := net.Listen("tcp", config.TCPServerAddr)
+	// if err != nil {
+	// 	log.Println("network error:", err)
+	// }
 
-	geerpc.Accept(l)
+	// geerpc.Accept(l)
+
+	s := rpc.NewServer()
+	s.Register(&services)
+	s.ListenAndServe(config.TCPServerAddr)
 }
 
 // panicIfErr 错误包裹函数.
