@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -43,11 +42,11 @@ func init() {
 	loginTemplate = template.Must(template.ParseFiles("../templates/login.html"))
 	profileTemplate = template.Must(template.ParseFiles("../templates/profile.html"))
 	jumpTemplate = template.Must(template.ParseFiles("../templates/jump.html"))
-
-	log.SetFlags(log.LstdFlags | log.Llongfile) // 暂时在这里初始化 log
 }
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	// 初始化 rpc 客户端并且连接 rpc 服务器
 	var err error
 	rpcClient, err = rpc.Client(config.TCPClientPoolSize, config.TCPServerAddr)
@@ -83,7 +82,7 @@ func SignUp(rw http.ResponseWriter, req *http.Request) {
 			rw.Write([]byte("Username and password couldn't be NULL!"))
 			return
 		}
-		fmt.Printf("userName = %s, password = %s, nickName = %s\n", userName, password, nickName)
+		log.Printf("userName = %s, password = %s, nickName = %s\n", userName, password, nickName)
 		arg := protocol.ReqSignUp{
 			UserName: userName,
 			Password: password,

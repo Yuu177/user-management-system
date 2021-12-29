@@ -11,7 +11,7 @@ const (
 	MaxExTime int = 30
 
 	// 连接数据库地址.
-	MysqlDB string = "user:user@(127.0.0.1:3306)/testdb01?charset=utf8"
+	MysqlDB string = "user:user@tcp(127.0.0.1:3306)/testdb01?charset=utf8&parseTime=True&loc=Local"
 	// 数据库一个连接的最大生命周期.
 	// ConnMaxLifetime time.Duration = 2 * time.Second
 	ConnMaxLifetime time.Duration = 14400 * time.Second

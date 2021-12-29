@@ -13,6 +13,8 @@ import (
 type UserServices struct{}
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	var services UserServices
 	s := rpc.NewServer()
 	s.Register(&services)

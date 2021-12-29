@@ -74,9 +74,6 @@ func (s *service) registerMethods() {
 			continue
 		}
 
-		// if mType.NumIn() != 3 {
-		// 	continue
-		// }
 		// 返回值必须只有一个 error
 		if mType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
 			continue

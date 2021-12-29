@@ -1,20 +1,17 @@
 package redis
 
 import (
-	"fmt"
 	"log"
 	"time"
+	"userSystem/config"
 	"userSystem/protocol"
 
 	"github.com/go-redis/redis"
 )
 
-// 声明一个全局的rdb变量
 var rdb *redis.Client
 
 func init() {
-	log.SetFlags(log.LstdFlags | log.Llongfile) // 暂时在这里初始化 log
-
 	initClient()
 }
 
@@ -22,13 +19,14 @@ func init() {
 func initClient() (err error) {
 	rdb = redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
+		Password: "",                   // no password set
+		DB:       0,                    // use default DB
+		PoolSize: config.RedisPoolSize, // 设置 redis 连接池大小
 	})
 
 	_, err = rdb.Ping().Result()
 	if err != nil {
-		fmt.Println("redis can not conn")
+		log.Println("redis can not conn")
 		return err
 	}
 	return nil
@@ -46,7 +44,7 @@ func set(key string, value interface{}, expiration int64) error {
 func get(key string) (string, error) {
 	val, err := rdb.Get(key).Result()
 	if err != nil {
-		fmt.Printf("redisUtil failed, err: %v\n", err)
+		log.Printf("redisUtil failed, err: %v\n", err)
 		return "", err
 	}
 	return val, err
