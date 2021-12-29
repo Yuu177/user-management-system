@@ -1,189 +1,190 @@
 package main
 
 import (
-	"geerpc/config"
-	"geerpc/mysql"
-	"geerpc/protocol"
-	"geerpc/rpc"
-	"geerpc/token"
 	"log"
+	"userSystem/config"
+	"userSystem/mysql"
+	"userSystem/protocol"
+	"userSystem/redis"
+	"userSystem/rpc"
+	"userSystem/utils"
 )
+
+type UserServices struct{}
 
 func main() {
 	var services UserServices
-	// //注册服务.
-	// panicIfErr(geerpc.Register(&services)) //注册 user 的所有方法. like: user.loginAuth()
-	// // panicIfErr(server.Register("GetProfile", GetProfile, GetProfileService))
-	// // panicIfErr(server.Register("UpdateProfilePic", UpdateProfilePic, UpdateProfilePicService))
-	// // panicIfErr(server.Register("UpdateNickName", UpdateNickName, UpdateNickNameService))
-
-	// //监听并且处理连接.
-	// l, err := net.Listen("tcp", config.TCPServerAddr)
-	// if err != nil {
-	// 	log.Println("network error:", err)
-	// }
-
-	// geerpc.Accept(l)
-
 	s := rpc.NewServer()
 	s.Register(&services)
 	s.ListenAndServe(config.TCPServerAddr)
 }
 
-// panicIfErr 错误包裹函数.
-func panicIfErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-type UserServices struct{}
-
-// SignUpService 注册接口的实际服务，同时用于在注册时向rpc传递参数类型.
-func (s *UserServices) SignUp(arg protocol.User, reply *protocol.RespSignUp) error {
-	if arg.UserName == "" || arg.Password == "" {
-		reply.Ret = 1
+// 注册
+func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp) error {
+	if req.UserName == "" || req.Password == "" {
+		resp.Ret = 1
 		return nil
 	}
-	if arg.NickName == "" {
-		arg.NickName = arg.UserName
+	if req.NickName == "" {
+		req.NickName = req.UserName
 	}
 
-	if err := mysql.CreateAccount(&arg); err != nil {
-		reply.Ret = 2
-		log.Printf("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q\n", arg.UserName, err)
-		return nil
+	if err := mysql.CreateAccount(req.UserName, req.Password); err != nil {
+		resp.Ret = 2
+		log.Printf("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q\n", req.UserName, err)
+		return err
+	}
+	if err := mysql.CreateProfile(req.UserName, req.NickName); err != nil {
+		resp.Ret = 2
+		log.Printf("tcp.signUp: mysql.CreateProfile failed. usernam:%s, err:%q\n", req.UserName, err)
+		return err
 	}
 
-	reply.Ret = 0
+	resp.Ret = 0
 	return nil
 }
 
-// LoginService 登录接口的实际服务，同时用于在注册时向rpc传递参数类型.
-func (s *UserServices) Login(arg protocol.ReqLogin, reply *protocol.RespLogin) error {
-	log.Println("tpy...login")
-	ok, err := mysql.LoginAuth(arg.UserName, arg.Password)
+// 登陆
+func (s *UserServices) Login(req protocol.ReqLogin, resp *protocol.RespLogin) error {
+	ok, err := mysql.LoginAuth(req.UserName, req.Password)
 	if err != nil {
-		reply.Ret = 2
-		log.Printf("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q\n", arg.UserName, err)
-		return nil
+		resp.Ret = 2
+		log.Printf("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q\n", req.UserName, err)
+		return err
 	}
 	//账号或密码不正确.
 	if !ok {
-		reply.Ret = 1
+		resp.Ret = 1
 		return nil
 	}
-	t := token.GenerateToken(arg.UserName)
-	err = token.SaveToken(t, arg.UserName, int64(config.TokenMaxExTime))
+	token := utils.GetToken(req.UserName)
+	err = redis.SetToken(req.UserName, token, int64(config.MaxExTime))
 	if err != nil {
-		reply.Ret = 2
-		log.Printf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q\n", arg.UserName, t, err)
-		return nil
+		resp.Ret = 2
+		log.Printf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, token, err)
+		return err
 	}
-	reply.Ret = 0
-	reply.Token = t
-	log.Printf("tcp.login: login done. username:%s\n", arg.UserName)
+	resp.Ret = 0
+	resp.Token = token
+	log.Printf("tcp.login: login done. username:%s\n", req.UserName)
 	return nil
 }
 
-// GetProfileService 获取信息接口的实际服务，同时用于在注册时向rpc传递参数类型.
-func (s *UserServices) GetProfile(arg protocol.ReqGetProfile, reply *protocol.RespGetProfile) error {
+// 获取用户基本信息
+func (s *UserServices) GetProfile(req protocol.ReqGetProfile, resp *protocol.RespGetProfile) error {
 	// 校验token
-	ok, err := checkToken(arg.UserName, arg.Token)
+	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
-		reply.Ret = 3
-		log.Printf("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q\n", arg.UserName, arg.Token, err)
+		resp.Ret = 3
+		log.Printf("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
 		return err
 	}
 	if !ok {
-		reply.Ret = 1
-		return err
+		resp.Ret = 1
+		return nil
 	}
 
-	user, err := mysql.GetProfile(arg.UserName)
-	if err != nil {
-		reply.Ret = 3
-		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q\n", user.UserName, err)
-		return err
+	// 先尝试从redis取数据
+	userProfile, isRead := redis.GetProfile(req.UserName)
+	if isRead {
+		// redis 中读取到数据
+		log.Printf("redis tcp.getProfile done. username:%s\n", req.UserName)
+		*resp = protocol.RespGetProfile{Ret: 0, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
+		return nil
 	}
 
-	log.Printf("tcp.getProfile done. username:%s\n", user.UserName)
-	reply.Ret = 0
-	reply.UserName = user.UserName
-	reply.NickName = user.NickName
-	reply.PicName = user.PicName
-	// 下面这种是错误的
-	// reply = &protocol.RespGetProfile{Ret: 0, UserName: user.UserName, NickName: user.NickName, PicName: user.PicName}
-	log.Println(reply)
+	// redis 没有读取到数据，从 mysql 里取
+	userProfile, isRead = mysql.GetProfile(req.UserName)
+	if !isRead {
+		resp.Ret = 2
+		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q\n", req.UserName, err)
+		return err
+	}
+	// 向 redis 插入数据
+	redis.SetNickNameAndPicName(req.UserName, userProfile.NickName, userProfile.PicName)
+
+	log.Printf("tcp.getProfile done. username:%s\n", req.UserName)
+	*resp = protocol.RespGetProfile{Ret: 0, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
 	return nil
-
 }
 
-// UpdateProfilePicService 更新头像接口的实际服务(picName/FileName)，同时用于在注册时向rpc传递参数类型.
-func (s *UserServices) UpdateProfilePic(arg protocol.ReqUpdateProfilePic, reply *protocol.RespUpdateProfilePic) error {
+// 更新头像
+func (s *UserServices) UpdateProfilePic(req protocol.ReqUpdateProfilePic, resp *protocol.RespUpdateProfilePic) error {
 	// 校验token.
-	ok, err := checkToken(arg.UserName, arg.Token)
+	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
-		reply.Ret = 3
-		log.Printf("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q", arg.UserName, arg.Token, err)
+		resp.Ret = 3
+		log.Printf("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
 		return err
 	}
 	if !ok {
-		reply.Ret = 1
+		resp.Ret = 1
+		return nil
+	}
+
+	// 使 redis 对应的数据失效（由于数据将会被修改）
+	if err := redis.InvaildCache(req.UserName); err != nil {
+		resp.Ret = 3
+		log.Printf("tcp.updateProfilePic: redis.InvaildCache failed. username:%s, err:%q\n", req.UserName, err)
 		return err
 	}
 
-	// 写入数据库.
-	ok, err = mysql.UpdateProfilePic(arg.UserName, arg.FileName)
+	// 写入数据库
+	ok, err = mysql.UpdateProfilePic(req.UserName, req.FileName)
 	if err != nil {
-		reply.Ret = 3
-		log.Printf("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q", arg.UserName, arg.FileName, err)
+		resp.Ret = 3
+		log.Printf("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q\n", req.UserName, req.FileName, err)
 		return err
 	}
 	if !ok {
-		reply.Ret = 2
-		return err
+		resp.Ret = 2
+		return nil
 	}
-	reply.Ret = 0
-	log.Printf("tcp.updateProfilePic done. username:%s, filename:%s", arg.UserName, arg.FileName)
+	resp.Ret = 0
+	log.Printf("tcp.updateProfilePic done. username:%s, filename:%s\n", req.UserName, req.FileName)
 	return nil
 }
 
-// UpdateNickNameService 更新昵称接口的实际服务(NickName)，同时用于在注册时向rpc传递参数类型.
-func (s *UserServices) UpdateNickName(arg protocol.ReqUpdateNickName, reply *protocol.RespUpdateNickName) error {
-	// 校验token.
-	ok, err := checkToken(arg.UserName, arg.Token)
+// 更新昵称
+func (s *UserServices) UpdateNickName(req protocol.ReqUpdateNickName, resp *protocol.RespUpdateNickName) error {
+	// 校验token
+	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
-		reply.Ret = 3
-		log.Printf("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q\n", arg.UserName, arg.Token, err)
+		resp.Ret = 3
+		log.Printf("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
 		return err
 	}
 	if !ok {
-		reply.Ret = 1
+		resp.Ret = 1
+		return nil
+	}
+	// 使 redis 对应的数据失效（由于数据将会被修改）
+	if err := redis.InvaildCache(req.UserName); err != nil {
+		resp.Ret = 3
+		log.Printf("tcp.updateNickName: redis.InvaildCache failed. username:%s, err:%q\n", req.UserName, err)
 		return err
 	}
-
-	// 写入数据库.
-	ok, err = mysql.UpdateNickName(arg.UserName, arg.NickName)
+	// 写入数据库
+	ok, err = mysql.UpdateNickName(req.UserName, req.NickName)
 	if err != nil {
-		reply.Ret = 3
-		log.Printf("tcp.updateNickName: mysql.UpdateNickName failed. username:%s, nickname:%s, err:%q\n", arg.UserName, arg.NickName, err)
+		resp.Ret = 3
+		log.Printf("tcp.updateNickName: mysql.UpdateNickName failed. username:%s, nickname:%s, err:%q\n", req.UserName, req.NickName, err)
 		return err
 	}
 	if !ok {
-		reply.Ret = 2
-		return err
+		resp.Ret = 2
+		return nil
 	}
-	reply.Ret = 0
-	log.Printf("tcp.updateNickName done. username:%s, nickname:%s\n", arg.UserName, arg.NickName)
+	resp.Ret = 0
+	log.Printf("tcp.updateNickName done. username:%s, nickname:%s\n", req.UserName, req.NickName)
 	return nil
 }
 
-// checkToken  检查Token
-func checkToken(userName string, tk string) (bool, error) {
+// 检查Token
+func checkToken(userName string, token string) (bool, error) {
 	// 压测token
-	if tk == "test" {
+	if token == "test" {
 		return true, nil
 	}
-	return token.CheckToken(userName, tk)
+	return redis.CheckToken(userName, token)
 }

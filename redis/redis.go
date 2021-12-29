@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"userSystem/protocol"
 
 	"github.com/go-redis/redis"
 )
@@ -33,8 +34,7 @@ func initClient() (err error) {
 	return nil
 }
 
-// expire 失效时间。0 是永久
-func Set(key string, value interface{}, expiration int64) error { // 这里 value 还是换成 string 好一点感觉。因为这里反正存的是string
+func set(key string, value interface{}, expiration int64) error {
 	err := rdb.Set(key, value, time.Duration(expiration*1e9)).Err()
 	if err != nil {
 		log.Println("RedisSet Error! key:", key, "Details:", err.Error())
@@ -43,7 +43,7 @@ func Set(key string, value interface{}, expiration int64) error { // 这里 valu
 	return nil
 }
 
-func Get(key string) (string, error) {
+func get(key string) (string, error) {
 	val, err := rdb.Get(key).Result()
 	if err != nil {
 		fmt.Printf("redisUtil failed, err: %v\n", err)
@@ -52,10 +52,50 @@ func Get(key string) (string, error) {
 	return val, err
 }
 
-func Delete(key string) error {
-	err := rdb.Del(key).Err()
-	if err != nil {
-		log.Println("redis delete ", key, " Error. Details: ", err.Error())
+// 获取用户信息
+func GetProfile(userName string) (protocol.UserProfile, bool) {
+	if isExits := rdb.Exists(userName).Val(); isExits == 0 { // 0 为不存在
+		return protocol.UserProfile{}, false
 	}
-	return err
+
+	vals, err := rdb.HGetAll(userName).Result()
+	if err != nil {
+		return protocol.UserProfile{}, false
+	}
+	return protocol.UserProfile{NickName: vals["nick_name"], PicName: vals["pic_name"]}, true
+}
+
+// 设置昵称和头像
+func SetNickNameAndPicName(userName string, nickName string, picName string) error {
+	fields := map[string]interface{}{
+		"nick_name": nickName,
+		"pic_name":  picName,
+	}
+	err := rdb.HMSet(userName, fields).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// 删除 redis 中的数据，主要用于写入数据库之前，保持数据一致。
+func InvaildCache(userName string) error {
+	err := rdb.Del(userName).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// 设置存活时间并保存 token 到 redis
+func SetToken(userName string, token string, expiration int64) error {
+	return set("auth_"+userName, token, expiration)
+}
+
+func CheckToken(userName string, token string) (bool, error) {
+	val, err := get("auth_" + userName)
+	if err != nil {
+		return false, err
+	}
+	return token == val, nil
 }

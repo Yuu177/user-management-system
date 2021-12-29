@@ -3,44 +3,38 @@ package config
 import "time"
 
 const (
-	// RedisAddr redis地址.
+	// redis 地址.
 	RedisAddr string = "localhost:6379"
-	// RedisPoolSize 连接redis最多的连接(Maximum number of socket connections.).
+	// 连接 redis 最多的连接(Maximum number of socket connections.).
 	RedisPoolSize int = 30
-	// TokenMaxExTime token生存时间.
-	TokenMaxExTime int = 3600
+	// 生存时间（token 和 cookie）
+	MaxExTime int = 30
 
-	// MysqlDB 连接数据库地址.
-	MysqlDB string = "root:11111111@(127.0.0.1:3306)/test_db?charset=utf8"
-	// ConnMaxLifetime 数据库一个连接的最大生命周期.
-	//ConnMaxLifetime time.Duration = 2 * time.Second
+	// 连接数据库地址.
+	MysqlDB string = "user:user@(127.0.0.1:3306)/testdb01?charset=utf8"
+	// 数据库一个连接的最大生命周期.
+	// ConnMaxLifetime time.Duration = 2 * time.Second
 	ConnMaxLifetime time.Duration = 14400 * time.Second
-	// MaxIdleConns 连接池中最大空闲连接数.
+	// 连接池中最大空闲连接数.
 	MaxIdleConns int = 500
-	// MaxOpenConns 同时连接数据库中最多连接数.
+	// 同时连接数据库中最多连接数.
 	MaxOpenConns int = 500
 
-	// TCPServerLogPath TCP服务日志.
+	// TCP 服务日志.
 	TCPServerLogPath string = "./log/tcp_server.log"
 	// TCPServerAddr tcp server ip:port.
 	TCPServerAddr string = "[127.0.0.1]:8888"
-	// TCPClientPoolSize 客户端tcp连接池大小.
+	// 客户端tcp连接池大小.
 	TCPClientPoolSize int = 500
 
-	// HTTPServerLogPath HTTP服务日志.
+	// HTTP服务日志.
 	HTTPServerLogPath string = "./log/http_server.log"
-	// HTTPServerAddr HTTP服务地址.
+	// HTTP服务地址.
 	HTTPServerAddr string = "127.0.0.1:1088"
 
-	// StaticFilePath http静态文件服务地址.
+	// 静态文件服务地址.
 	StaticFilePath string = "../static/"
 
-	// DefaultImagePath 默认头像.
-	DefaultImagePath string = "andy.jpeg"
-
-	// DatabaseSettingUser string
-	// DatabaseSettingPassword,
-	// DatabaseSettingHost,
-	// DatabaseSettingPort,
-	// DatabaseSettingName
+	// 默认头像.
+	DefaultImagePath string = "tpy.jpeg"
 )

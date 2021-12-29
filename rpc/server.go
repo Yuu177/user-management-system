@@ -28,24 +28,11 @@ func NewServer() *Server {
 }
 
 func (s *Server) listen(addr string) (net.Listener, error) {
-	// tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// lis, err := net.ListenTCP("tcp", tcpAddr)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// return lis, nil
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal("network error: ", err)
 	}
 	return l, nil
-}
-
-func (s *Server) readRequestBody(cc Codec, body interface{}) error {
-	return cc.ReadBody(body)
 }
 
 func (s *Server) findService(serviceMethod string) (svc *service, mType *methodType, err error) {
@@ -107,11 +94,10 @@ func (s *Server) handleRequest(cc Codec, req *request) error {
 }
 
 func (s *Server) sendResponse(cc Codec, h *Header, body interface{}) {
-	log.Println("send .....")
+
 	if err := cc.Write(h, body); err != nil {
 		log.Println("rpc server: write response error:", err)
 	}
-	log.Println("send.... end")
 }
 
 func (s *Server) serveConn(conn net.Conn) {
@@ -119,26 +105,28 @@ func (s *Server) serveConn(conn net.Conn) {
 		log.Println("conn is nil")
 		return
 	}
-	// 每次来新的连接就new 一个 codec，因为 codec 的 conn 不一样
-	cc := NewGobCodec(conn)
-	req, err := s.readRequest(cc)
-	if err != nil {
-		if req == nil {
-			// cc.Close() // it's not possible to recover, so close the connection
+	for {
+		// 每次来新的连接就new 一个 codec，因为 codec 的 conn 不一样
+		cc := NewGobCodec(conn)
+		req, err := s.readRequest(cc)
+		if err != nil {
+			if req == nil {
+				// cc.Close() // it's not possible to recover, so close the connection
+				return
+			}
+			req.h.Error = err.Error()
+			s.sendResponse(cc, req.h, invalidRequest)
 			return
 		}
-		req.h.Error = err.Error()
-		s.sendResponse(cc, req.h, invalidRequest)
-		return
+		err = s.handleRequest(cc, req)
+		if err != nil {
+			// handle 返回失败的值
+			req.h.Error = err.Error()
+			s.sendResponse(cc, req.h, invalidRequest)
+			return
+		}
+		s.sendResponse(cc, req.h, req.reply.Interface())
 	}
-	err = s.handleRequest(cc, req)
-	if err != nil {
-		// handle 返回失败的值
-		req.h.Error = err.Error()
-		s.sendResponse(cc, req.h, invalidRequest)
-		return
-	}
-	s.sendResponse(cc, req.h, req.reply.Interface())
 }
 
 func (s *Server) acceptAndServeConn(listener net.Listener) error {
@@ -170,7 +158,3 @@ func (s *Server) Register(rcvr interface{}) {
 	svc := newService(rcvr)
 	s.serviceMap[svc.name] = svc
 }
-
-// func Register(rcvr interface{}) {
-// 	defaultServer.register(rcvr)
-// }

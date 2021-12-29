@@ -3,18 +3,12 @@ package mysql
 import (
 	"errors"
 	"fmt"
-	"geerpc/config"
-	"geerpc/protocol"
-	"geerpc/utils"
-
-	// "github.com/jinzhu/gorm"
-	// _ "github.com/jinzhu/gorm/dialects/mysql"
+	"userSystem/config"
+	"userSystem/protocol"
+	"userSystem/utils"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	// _ "github.com/go-sql-driver/mysql"
-	// _ "github.com/jinzhu/gorm/dialects/mysql"
-	// "gorm.io/gorm"
 )
 
 // db连接
@@ -54,7 +48,10 @@ func init() {
 	// 连接池最大允许的空闲连接数，如果没有sql任务需要执行的连接数大于20，超过的连接会被连接池关闭
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
 
-	db.AutoMigrate(&protocol.User{}) // 自动建表
+	// 自动建表
+	db.AutoMigrate(&protocol.User{})
+	db.AutoMigrate(&protocol.UserProfile{})
+
 }
 
 // 获取 gorm db，其他包调用此方法即可拿到 db
@@ -63,10 +60,24 @@ func GetDB() *gorm.DB {
 	return db
 }
 
-// 创建一个账号
-func CreateAccount(user *protocol.User) error {
-	user.Password = utils.Sha256(user.Password)
+// 创建账号
+func CreateAccount(userName string, password string) error {
+	var user protocol.User
+	user.UserName = userName
+	user.Password = utils.Sha256(password)
 	if err := db.Create(&user).Error; err != nil {
+		fmt.Println("插入失败", err)
+		return err
+	}
+	return nil
+}
+
+// 创建用户信息
+func CreateProfile(userName string, nickName string) error {
+	var up protocol.UserProfile
+	up.UserName = userName
+	up.NickName = nickName
+	if err := db.Create(&up).Error; err != nil {
 		fmt.Println("插入失败", err)
 		return err
 	}
@@ -84,19 +95,32 @@ func LoginAuth(userName string, password string) (bool, error) {
 	return false, nil
 }
 
-// GetProfile 获取用户信息.
-func GetProfile(userName string) (protocol.User, error) {
-	var user protocol.User
-	err := db.Where("user_name = ?", userName).First(&user).Error
+// 获取用户信息
+func GetProfile(userName string) (protocol.UserProfile, bool) {
+	var up protocol.UserProfile
+	err := db.Where("user_name = ?", userName).First(&up).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return protocol.User{}, err
+		return protocol.UserProfile{}, false
 	}
-	return user, nil
+	return up, true
 }
 
+// 更新用户全部信息
+func UpdateProfile(userName string, nickName string, picName string) (bool, error) {
+	u := protocol.UserProfile{
+		NickName: nickName,
+		PicName:  picName,
+	}
+	err := db.Save(&u).Error
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// 更新昵称
 func UpdateNickName(userName, nickName string) (bool, error) {
-	u := protocol.User{}
-	// 更新用户表的密码
+	u := protocol.UserProfile{}
 	// UPDATE `users` SET `nick_name` = 'nickName' WHERE (user_name = 'userName')
 	err := db.Model(&u).Where("user_name = ?", userName).Update("nick_name", nickName).Error
 	if err != nil {
@@ -105,8 +129,9 @@ func UpdateNickName(userName, nickName string) (bool, error) {
 	return true, nil
 }
 
+// 更新头像
 func UpdateProfilePic(userName, picName string) (bool, error) {
-	u := protocol.User{}
+	u := protocol.UserProfile{}
 	err := db.Model(&u).Where("user_name = ?", userName).Update("pic_name", picName).Error
 	if err != nil {
 		return false, err

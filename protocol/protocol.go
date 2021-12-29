@@ -1,36 +1,36 @@
 package protocol
 
-// ReqSignUp 注册请求.
+// 注册请求.
 type ReqSignUp struct {
 	UserName string `json:"user_name"` // 用户名, 不为空
 	Password string `json:"password"`  // 密码, 不为空
 	NickName string `json:"nick_name"` // 昵称
 }
 
-// RespSignUp 注册返回.
+// 注册返回.
 type RespSignUp struct {
 	Ret int `json:"ret"` // 结果码 0:成功 1:用户名或密码为空 2:用户名重复或创建失败
 }
 
-// ReqLogin 登录请求.
+// 登录请求.
 type ReqLogin struct {
 	UserName string `json:"user_name"` // 用户名, 不为空
 	Password string `json:"password"`  // 密码, 不为空
 }
 
-// RespLogin 登录返回.
+// 登录返回.
 type RespLogin struct {
 	Ret   int    `json:"ret"`   // 结果码 0:成功 1:用户名或密码错误 2:登录失败
 	Token string `json:"token"` // token
 }
 
-// ReqGetProfile 获取信息请求.
+// 获取信息请求.
 type ReqGetProfile struct {
 	UserName string `json:"user_name"`
 	Token    string `json:"token"`
 }
 
-// RespGetProfile 获取信息返回.
+// 获取信息返回.
 type RespGetProfile struct {
 	Ret      int    `json:"ret"`       // 结果码 0:成功 1:token校验失败 2:数据为空 3:获取失败
 	UserName string `json:"user_name"` // 用户名，不为空
@@ -38,33 +38,39 @@ type RespGetProfile struct {
 	PicName  string `json:"pic_name"`  // 头像(路径信息)
 }
 
-// ReqUpdateProfilePic 更新用户头像请求.
+// 更新用户头像请求.
 type ReqUpdateProfilePic struct {
 	UserName string `json:"user_name"` // 用户名, 不为空
 	FileName string `json:"file_name"` // 头像文件名
 	Token    string `json:"token"`     // token
 }
 
-// RespUpdateProfilePic 更新用户头像返回.
+// 更新用户头像返回.
 type RespUpdateProfilePic struct {
 	Ret int `json:"ret"` // 结果码 0:成功 1:token校验失败 2:用户不存在 3:更新失败
 }
 
-// ReqUpdateNickName 更新用户昵称请求.
+// 更新用户昵称请求.
 type ReqUpdateNickName struct {
 	UserName string `json:"user_name"` // 用户名, 不为空
 	NickName string `json:"nick_name"` // 昵称
 	Token    string `json:"token"`     // token
 }
 
-// RespUpdateNickName 更新用户头像返回.
+// 更新用户头像返回.
 type RespUpdateNickName struct {
 	Ret int `json:"ret"` // 结果码 0:成功 1:token校验失败 2:用户不存在 3:更新失败
 }
 
+// 用户表，用来保存账号密码
 type User struct {
 	UserName string `gorm:"column:user_name;primary_key"` // 设置自动生成表的表名
-	NickName string `gorm:"column:nick_name"`
 	Password string `gorm:"column:password;not null"`
+}
+
+// 用户信息表，用来保存用户除了密码的其他信息
+type UserProfile struct {
+	UserName string `gorm:"column:user_name;primary_key"` // 设置自动生成表的表名
+	NickName string `gorm:"column:nick_name"`
 	PicName  string `gorm:"column:pic_name"` // 用户头像文件名名称
 }

@@ -64,24 +64,24 @@ func (s *service) call(m *methodType, arg reflect.Value, reply reflect.Value) er
 }
 
 func (s *service) registerMethods() {
-	// log.Println("tpy register methods")
 	s.methods = make(map[string]*methodType)
 	for i := 0; i < s.typ.NumMethod(); i++ {
-		// log.Println("tpy register methods")
-
 		method := s.typ.Method(i)
 		mType := method.Type
-		// 这里入参必须为 3，出参必须为 1
+		// 这里入参必须为 3，返回值必须为 1
 		// 方法反射时为 3 个，第 0 个是自身
 		if mType.NumIn() != 3 || mType.NumOut() != 1 {
 			continue
 		}
+
+		// if mType.NumIn() != 3 {
+		// 	continue
+		// }
 		// 返回值必须只有一个 error
 		if mType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
 			continue
 		}
 		argType, replyType := mType.In(1), mType.In(2)
-		// log.Println(method, argType, replyType)
 		s.methods[method.Name] = &methodType{
 			method:    method,
 			argType:   argType,
@@ -89,12 +89,10 @@ func (s *service) registerMethods() {
 		}
 		log.Printf("rpc server: register %s.%s\n", s.name, method.Name)
 	}
-	// log.Println("tpy register end")
 }
 
 // 把结构体传进来解析该结构体的[方法类型]和[名称]以及它们的[入参]、[出参]
 func newService(rcvr interface{}) *service {
-	// log.Println("tpy new service")
 	s := new(service)
 	s.rcvr = reflect.ValueOf(rcvr)
 	s.name = reflect.Indirect(s.rcvr).Type().Name()
