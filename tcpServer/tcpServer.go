@@ -48,7 +48,13 @@ func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp)
 
 // 登陆
 func (s *UserServices) Login(req protocol.ReqLogin, resp *protocol.RespLogin) error {
-	ok, err := mysql.LoginAuth(req.UserName, req.Password)
+	var err error
+	var ok bool
+	if jump := redis.LoginAuth(req.UserName, req.Password); jump {
+		goto OK_LOGIN
+	}
+
+	ok, err = mysql.LoginAuth(req.UserName, req.Password)
 	if err != nil {
 		resp.Ret = 2
 		log.Printf("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q\n", req.UserName, err)
@@ -59,6 +65,8 @@ func (s *UserServices) Login(req protocol.ReqLogin, resp *protocol.RespLogin) er
 		resp.Ret = 1
 		return nil
 	}
+OK_LOGIN:
+	redis.SetPassword(req.UserName, req.Password)
 	token := utils.GetToken(req.UserName)
 	err = redis.SetToken(req.UserName, token, int64(config.MaxExTime))
 	if err != nil {

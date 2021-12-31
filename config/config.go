@@ -16,16 +16,16 @@ const (
 	// ConnMaxLifetime time.Duration = 2 * time.Second
 	ConnMaxLifetime time.Duration = 14400 * time.Second
 	// 连接池中最大空闲连接数.
-	MaxIdleConns int = 500
+	MaxIdleConns int = 2000
 	// 同时连接数据库中最多连接数.
-	MaxOpenConns int = 500
+	MaxOpenConns int = 2000
 
 	// TCP 服务日志.
 	TCPServerLogPath string = "./log/tcp_server.log"
 	// TCPServerAddr tcp server ip:port.
 	TCPServerAddr string = "[127.0.0.1]:8888"
 	// 客户端tcp连接池大小.
-	TCPClientPoolSize int = 500
+	TCPClientPoolSize int = 2000
 
 	// HTTP服务日志.
 	HTTPServerLogPath string = "./log/http_server.log"

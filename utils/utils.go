@@ -2,7 +2,6 @@ package utils
 
 import (
 	"crypto/md5"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -30,12 +29,6 @@ func MD5(str string) string {
 	h := md5.New()
 	h.Write([]byte(str))
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-func Sha256(passwd string) string {
-	rh := sha256.New()
-	rh.Write([]byte(passwd))
-	return hex.EncodeToString(rh.Sum(nil))
 }
 
 func GetToken(userName string) string {

@@ -5,6 +5,7 @@ import (
 	"time"
 	"userSystem/config"
 	"userSystem/protocol"
+	"userSystem/utils"
 
 	"github.com/go-redis/redis"
 )
@@ -48,6 +49,26 @@ func get(key string) (string, error) {
 		return "", err
 	}
 	return val, err
+}
+
+// 登陆验证
+func LoginAuth(userName string, password string) bool {
+	var pwdKey = userName + "_pwd"
+	if isExits := rdb.Exists(pwdKey).Val(); isExits == 0 { // 0 为不存在
+		return false
+	}
+	pwd, err := get(pwdKey)
+	if err != nil {
+		return false
+	}
+	if pwd == utils.MD5(password) {
+		return true
+	}
+	return false
+}
+
+func SetPassword(userName string, password string) {
+	set(userName+"_pwd", utils.MD5(password), int64(config.MaxExTime))
 }
 
 // 获取用户信息

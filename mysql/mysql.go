@@ -43,7 +43,7 @@ func init() {
 func CreateAccount(userName string, password string) error {
 	var user protocol.User
 	user.UserName = userName
-	user.Password = utils.Sha256(password)
+	user.Password = utils.MD5(password)
 	if err := db.Create(&user).Error; err != nil {
 		log.Println("插入失败", err)
 		return err
@@ -67,7 +67,7 @@ func CreateProfile(userName string, nickName string) error {
 func LoginAuth(userName string, password string) (bool, error) {
 	var user protocol.User
 	db.Where("user_name = ?", userName).First(&user)
-	pwd := utils.Sha256(password)
+	pwd := utils.MD5(password)
 	if user.Password == pwd {
 		return true, nil
 	}
