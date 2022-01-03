@@ -39,8 +39,8 @@ func init() {
 
 }
 
-// 创建账号
-func CreateAccount(userName string, password string) error {
+// 创建账号。往 user 表插入信息
+func insertUser(userName string, password string) error {
 	var user protocol.User
 	user.UserName = userName
 	user.Password = utils.MD5(password)
@@ -51,8 +51,8 @@ func CreateAccount(userName string, password string) error {
 	return nil
 }
 
-// 创建用户信息
-func CreateProfile(userName string, nickName string) error {
+// 创建用户信息。往 user_profile 表插入信息
+func insertUserProfile(userName string, nickName string) error {
 	var up protocol.UserProfile
 	up.UserName = userName
 	up.NickName = nickName
@@ -61,6 +61,16 @@ func CreateProfile(userName string, nickName string) error {
 		return err
 	}
 	return nil
+}
+
+func CreateUser(userName, nickName, password string) (err error) {
+	if err = insertUser(userName, password); err != nil {
+		return err
+	}
+	if err = insertUserProfile(userName, nickName); err != nil {
+		return err
+	}
+	return err
 }
 
 // 登陆验证

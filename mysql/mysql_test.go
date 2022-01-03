@@ -1,21 +1,22 @@
 package mysql
 
-// const (
-// 	MaxData = 10000000
-// )
+import "testing"
 
-// // 初始化测试数据库,创建 10 000 000 个数据.
-// func TestCreateAccount(t *testing.T) {
-// 	for i := 0; i < MaxData; i++ {
-// 		userName := "bot" + strconv.Itoa(i)
-// 		if err := CreateAccount(userName, "1234"); err != nil {
-// 			t.Errorf("CreateAccount didn't pass. username:%s, err:%q", userName, err)
-// 		}
-// 		if err := CreateProfile(userName, "bot"); err != nil {
-// 			t.Errorf("CreateProfile didn't pass. username:%s, err:%q", userName, err)
-// 		}
-// 		if i%100 == 0 {
-// 			t.Logf("now is %d", i)
-// 		}
-// 	}
-// }
+func TestLoginAuth(t *testing.T) {
+	var tests = []struct {
+		userName, password string
+		ok                 bool
+	}{
+		{"user0", "user", true},
+		{"user1", "user", true},
+		{"noExist", "noExist", false},
+		{"", "", false},
+		{"user0", "", false},
+		{"", "user", false},
+	}
+	for _, test := range tests {
+		if ok, err := LoginAuth(test.userName, test.password); err != nil || ok != test.ok {
+			t.Errorf("LoginAuth no pass. userName:%s, password:%s, ok:%t", test.userName, test.password, test.ok)
+		}
+	}
+}

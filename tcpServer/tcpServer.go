@@ -31,16 +31,22 @@ func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp)
 		req.NickName = req.UserName
 	}
 
-	if err := mysql.CreateAccount(req.UserName, req.Password); err != nil {
+	if err := mysql.CreateUser(req.UserName, req.NickName, req.Password); err != nil {
 		resp.Ret = 2
-		log.Printf("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q\n", req.UserName, err)
+		log.Printf("tcp.signUp: mysql.CreateUser failed. usernam:%s, err:%q\n", req.UserName, err)
 		return err
 	}
-	if err := mysql.CreateProfile(req.UserName, req.NickName); err != nil {
-		resp.Ret = 2
-		log.Printf("tcp.signUp: mysql.CreateProfile failed. usernam:%s, err:%q\n", req.UserName, err)
-		return err
-	}
+
+	// if err := mysql.CreateAccount(req.UserName, req.Password); err != nil {
+	// 	resp.Ret = 2
+	// 	log.Printf("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q\n", req.UserName, err)
+	// 	return err
+	// }
+	// if err := mysql.CreateProfile(req.UserName, req.NickName); err != nil {
+	// 	resp.Ret = 2
+	// 	log.Printf("tcp.signUp: mysql.CreateProfile failed. usernam:%s, err:%q\n", req.UserName, err)
+	// 	return err
+	// }
 
 	resp.Ret = 0
 	return nil
