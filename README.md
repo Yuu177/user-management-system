@@ -10,7 +10,7 @@
 
 * **HTTP Server** 负责处理 HTTP 请求，对用户数据进行简单处理并转发至 TCP 服务。
 
-* **TCP Server **处理 HTTP 服务转发的请求并访问 MySQL 和 redis。
+* **TCP Server** 处理 HTTP 服务转发的请求并访问 MySQL 和 redis。
 
 * http server 和 tcp server 之间的通信主要是通过 rpc 协议。
 
@@ -181,21 +181,17 @@ go run httpServer.go
 
 **用户登陆**
 
-![login](./resource/login.jpg)
-
-**用户登陆成功**
-
-![login_success](./resource/login_success.jpg)
+![login](./resource/login.png)
 
 **显示用户信息**
 
 > 默认用户图像信息为空
 
-![updatePicName](./resource/updatePicName.jpg)
+![showProfile](./resource/showProfile.png)
 
-**修改用户头像路径**
+**修改用户头像**
 
-![updatePicName_succes](./resource/updatePicName_succes.jpg)
+![updatePic](./resource/updatePic.png)
 
 ### 单元测试
 
