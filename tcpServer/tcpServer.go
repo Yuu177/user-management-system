@@ -34,19 +34,8 @@ func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp)
 	if err := mysql.CreateUser(req.UserName, req.NickName, req.Password); err != nil {
 		resp.Ret = 2
 		log.Printf("tcp.signUp: mysql.CreateUser failed. usernam:%s, err:%q\n", req.UserName, err)
-		return err
+		return nil
 	}
-
-	// if err := mysql.CreateAccount(req.UserName, req.Password); err != nil {
-	// 	resp.Ret = 2
-	// 	log.Printf("tcp.signUp: mysql.CreateAccount failed. usernam:%s, err:%q\n", req.UserName, err)
-	// 	return err
-	// }
-	// if err := mysql.CreateProfile(req.UserName, req.NickName); err != nil {
-	// 	resp.Ret = 2
-	// 	log.Printf("tcp.signUp: mysql.CreateProfile failed. usernam:%s, err:%q\n", req.UserName, err)
-	// 	return err
-	// }
 
 	resp.Ret = 0
 	return nil
@@ -54,36 +43,55 @@ func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp)
 
 // 登陆
 func (s *UserServices) Login(req protocol.ReqLogin, resp *protocol.RespLogin) error {
-	var err error
-	var ok bool
-	if jump := redis.LoginAuth(req.UserName, req.Password); jump {
-		goto OK_LOGIN
-	}
-
-	ok, err = mysql.LoginAuth(req.UserName, req.Password)
+	ok, err := loginAuth(req)
 	if err != nil {
-		resp.Ret = 2
-		log.Printf("tcp.login: mysql.LoginAuth failed. usernam:%s, err:%q\n", req.UserName, err)
-		return err
-	}
-	//账号或密码不正确.
-	if !ok {
-		resp.Ret = 1
+		resp.Ret = 2 // 内部出错
 		return nil
 	}
-OK_LOGIN:
-	redis.SetPassword(req.UserName, req.Password)
+	if !ok {
+		resp.Ret = 1 // 用户名或密码错误
+		return nil
+	}
+	// 登陆成功，更新 redis 中的数据
 	token := utils.GetToken(req.UserName)
-	err = redis.SetToken(req.UserName, token, int64(config.MaxExTime))
+	err = updateCache(req, token)
 	if err != nil {
 		resp.Ret = 2
-		log.Printf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, token, err)
-		return err
+		return nil
 	}
+
+	// 一切正常
 	resp.Ret = 0
 	resp.Token = token
 	log.Printf("tcp.login: login done. username:%s\n", req.UserName)
 	return nil
+}
+
+func updateCache(req protocol.ReqLogin, token string) error {
+	redis.SetPassword(req.UserName, req.Password)
+	err := redis.SetToken(req.UserName, token, int64(config.MaxExTime))
+	if err != nil {
+		log.Printf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, token, err)
+		return err
+	}
+	return nil
+}
+
+func loginAuth(req protocol.ReqLogin) (bool, error) {
+	// 先从 redis 中验证，如果 redis 通过就不用验证了。
+	ok := redis.LoginAuth(req.UserName, req.Password)
+	if ok {
+		log.Printf("redis ok, username:%s\n", req.UserName)
+		return true, nil
+	}
+
+	// 如果 redis 不通过（redis 中没有数据或者数据有问题），再从 mysql 中查看
+	ok, err := mysql.LoginAuth(req.UserName, req.Password)
+	if err != nil {
+		log.Printf("tcp.login: mysql.LoginAuth failed. username:%s, err:%q\n", req.UserName, err)
+		return false, nil
+	}
+	return ok, nil
 }
 
 // 获取用户基本信息
@@ -100,28 +108,37 @@ func (s *UserServices) GetProfile(req protocol.ReqGetProfile, resp *protocol.Res
 		return nil
 	}
 
+	userProfile, isRead := getUserProfile(req)
+	if !isRead {
+		resp.Ret = 2
+		return nil
+	}
+
+	log.Printf("tcp.getProfile done. username:%s\n", req.UserName)
+	*resp = protocol.RespGetProfile{Ret: 0, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
+	return nil
+}
+
+func getUserProfile(req protocol.ReqGetProfile) (protocol.UserProfile, bool) {
 	// 先尝试从redis取数据
 	userProfile, isRead := redis.GetProfile(req.UserName)
 	if isRead {
 		// redis 中读取到数据
 		log.Printf("redis tcp.getProfile done. username:%s\n", req.UserName)
-		*resp = protocol.RespGetProfile{Ret: 0, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
-		return nil
+		return userProfile, true
 	}
 
 	// redis 没有读取到数据，从 mysql 里取
 	userProfile, isRead = mysql.GetProfile(req.UserName)
 	if !isRead {
-		resp.Ret = 2
-		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s, err:%q\n", req.UserName, err)
-		return err
+		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s\n", req.UserName)
+		return protocol.UserProfile{}, false
 	}
+
 	// 向 redis 插入数据
 	redis.SetNickNameAndPicName(req.UserName, userProfile.NickName, userProfile.PicName)
 
-	log.Printf("tcp.getProfile done. username:%s\n", req.UserName)
-	*resp = protocol.RespGetProfile{Ret: 0, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
-	return nil
+	return userProfile, true
 }
 
 // 更新头像
