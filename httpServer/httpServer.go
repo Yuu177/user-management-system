@@ -161,10 +161,10 @@ func callSignUp(rw http.ResponseWriter, arg protocol.ReqSignUp, reply *protocol.
 
 func handleSignUpRet(rw http.ResponseWriter, arg protocol.ReqSignUp, reply protocol.RespSignUp) {
 	switch reply.Ret {
-	case 0:
+	case protocol.Success:
 		rw.Write([]byte("创建账号成功！"))
-	case 1:
-		rw.Write([]byte("用户名或密码错误！"))
+	case protocol.UserNameOrPasswordNull:
+		rw.Write([]byte("用户名或密码为空！"))
 	default:
 		rw.Write([]byte("创建账号失败！"))
 	}
@@ -203,7 +203,7 @@ func callLogin(rw http.ResponseWriter, arg protocol.ReqLogin, reply *protocol.Re
 
 func handleLoginRet(rw http.ResponseWriter, arg protocol.ReqLogin, reply protocol.RespLogin) {
 	switch reply.Ret {
-	case 0:
+	case protocol.Success:
 		// 登陆成功将 username,token 作为 Cookies 发送给客户端
 		cookie := http.Cookie{Name: "username", Value: arg.UserName, MaxAge: config.MaxExTime}
 		http.SetCookie(rw, &cookie)
@@ -211,7 +211,7 @@ func handleLoginRet(rw http.ResponseWriter, arg protocol.ReqLogin, reply protoco
 		http.SetCookie(rw, &cookie)
 
 		templateJump(rw, JumpResponse{Msg: "登录成功！"})
-	case 1:
+	case protocol.UserNameOrPasswordError:
 		templateLogin(rw, LoginResponse{Msg: "用户名或密码错误！"})
 	default:
 		templateLogin(rw, LoginResponse{Msg: "登录失败！"})
@@ -249,7 +249,7 @@ func callGetProfile(rw http.ResponseWriter, arg protocol.ReqGetProfile, reply *p
 
 func handleGetProfileRet(rw http.ResponseWriter, arg protocol.ReqGetProfile, reply protocol.RespGetProfile) {
 	switch reply.Ret {
-	case 0:
+	case protocol.Success:
 		if reply.PicName == "" {
 			reply.PicName = config.DefaultImagePath
 		}
@@ -259,9 +259,9 @@ func handleGetProfileRet(rw http.ResponseWriter, arg protocol.ReqGetProfile, rep
 			UserName: reply.UserName,
 			NickName: reply.NickName,
 			PicName:  reply.PicName})
-	case 1:
+	case protocol.TokenCheckFailed:
 		templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
-	case 2:
+	case protocol.DataIsNil:
 		templateJump(rw, JumpResponse{Msg: "用户不存在！"})
 	default:
 		templateJump(rw, JumpResponse{Msg: "获取用户信息失败！"})
@@ -306,11 +306,11 @@ func callUpdateNickName(rw http.ResponseWriter, arg protocol.ReqUpdateNickName, 
 
 func handleUpdateNickNameRet(rw http.ResponseWriter, arg protocol.ReqUpdateNickName, reply protocol.RespUpdateNickName) {
 	switch reply.Ret {
-	case 0:
+	case protocol.Success:
 		templateJump(rw, JumpResponse{Msg: "修改昵称成功！"})
-	case 1:
+	case protocol.TokenCheckFailed:
 		templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
-	case 2:
+	case protocol.UserNotExist:
 		templateJump(rw, JumpResponse{Msg: "用户不存在！"})
 	default:
 		templateJump(rw, JumpResponse{Msg: "修改昵称失败！"})
@@ -349,11 +349,11 @@ func callUploadProfilePicture(rw http.ResponseWriter, arg protocol.ReqUpdateProf
 
 func handleUploadProfilePictureRet(rw http.ResponseWriter, arg protocol.ReqUpdateProfilePic, reply protocol.RespUpdateProfilePic) {
 	switch reply.Ret {
-	case 0:
+	case protocol.Success:
 		templateJump(rw, JumpResponse{Msg: "修改头像成功！"})
-	case 1:
+	case protocol.TokenCheckFailed:
 		templateLogin(rw, LoginResponse{Msg: "请重新登录！"})
-	case 2:
+	case protocol.UserNotExist:
 		templateJump(rw, JumpResponse{Msg: "用户不存在！"})
 	default:
 		templateJump(rw, JumpResponse{Msg: "修改头像失败！"})

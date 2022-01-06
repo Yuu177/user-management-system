@@ -24,7 +24,7 @@ func main() {
 // 注册
 func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp) error {
 	if req.UserName == "" || req.Password == "" {
-		resp.Ret = 1
+		resp.Ret = protocol.UserNameOrPasswordNull
 		return nil
 	}
 	if req.NickName == "" {
@@ -32,12 +32,12 @@ func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp)
 	}
 
 	if err := mysql.CreateUser(req.UserName, req.NickName, req.Password); err != nil {
-		resp.Ret = 2
+		resp.Ret = protocol.UserCreateFailed
 		log.Printf("tcp.signUp: mysql.CreateUser failed. usernam:%s, err:%q\n", req.UserName, err)
 		return nil
 	}
 
-	resp.Ret = 0
+	resp.Ret = protocol.Success
 	return nil
 }
 
@@ -45,23 +45,23 @@ func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp)
 func (s *UserServices) Login(req protocol.ReqLogin, resp *protocol.RespLogin) error {
 	ok, err := loginAuth(req)
 	if err != nil {
-		resp.Ret = 2 // 内部出错
+		resp.Ret = protocol.LoginFailed // 内部出错
 		return nil
 	}
 	if !ok {
-		resp.Ret = 1 // 用户名或密码错误
+		resp.Ret = protocol.UserNameOrPasswordError // 用户名或密码错误
 		return nil
 	}
 	// 登陆成功，更新 redis 中的数据
 	token := utils.GetToken(req.UserName)
 	err = updateCache(req, token)
 	if err != nil {
-		resp.Ret = 2
+		resp.Ret = protocol.LoginFailed
 		return nil
 	}
 
 	// 一切正常
-	resp.Ret = 0
+	resp.Ret = protocol.Success
 	resp.Token = token
 	log.Printf("tcp.login: login done. username:%s\n", req.UserName)
 	return nil
@@ -72,7 +72,7 @@ func updateCache(req protocol.ReqLogin, token string) error {
 	err := redis.SetToken(req.UserName, token, int64(config.MaxExTime))
 	if err != nil {
 		log.Printf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, token, err)
-		return err
+		return nil
 	}
 	return nil
 }
@@ -99,23 +99,23 @@ func (s *UserServices) GetProfile(req protocol.ReqGetProfile, resp *protocol.Res
 	// 校验token
 	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
-		resp.Ret = 3
+		resp.Ret = protocol.GetProfileFailed
 		log.Printf("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
-		return err
+		return nil
 	}
 	if !ok {
-		resp.Ret = 1
+		resp.Ret = protocol.TokenCheckFailed
 		return nil
 	}
 
 	userProfile, isRead := getUserProfile(req)
 	if !isRead {
-		resp.Ret = 2
+		resp.Ret = protocol.DataIsNil
 		return nil
 	}
 
 	log.Printf("tcp.getProfile done. username:%s\n", req.UserName)
-	*resp = protocol.RespGetProfile{Ret: 0, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
+	*resp = protocol.RespGetProfile{Ret: protocol.Success, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
 	return nil
 }
 
@@ -146,34 +146,34 @@ func (s *UserServices) UpdateProfilePic(req protocol.ReqUpdateProfilePic, resp *
 	// 校验token.
 	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
-		resp.Ret = 3
+		resp.Ret = protocol.UpdateFailed
 		log.Printf("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
-		return err
+		return nil
 	}
 	if !ok {
-		resp.Ret = 1
+		resp.Ret = protocol.TokenCheckFailed
 		return nil
 	}
 
 	// 使 redis 对应的数据失效（由于数据将会被修改）
 	if err := redis.InvaildCache(req.UserName); err != nil {
-		resp.Ret = 3
+		resp.Ret = protocol.UpdateFailed
 		log.Printf("tcp.updateProfilePic: redis.InvaildCache failed. username:%s, err:%q\n", req.UserName, err)
-		return err
+		return nil
 	}
 
 	// 写入数据库
 	ok, err = mysql.UpdateProfilePic(req.UserName, req.FileName)
 	if err != nil {
-		resp.Ret = 3
+		resp.Ret = protocol.UpdateFailed
 		log.Printf("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q\n", req.UserName, req.FileName, err)
-		return err
-	}
-	if !ok {
-		resp.Ret = 2
 		return nil
 	}
-	resp.Ret = 0
+	if !ok {
+		resp.Ret = protocol.UserNotExist
+		return nil
+	}
+	resp.Ret = protocol.Success
 	log.Printf("tcp.updateProfilePic done. username:%s, filename:%s\n", req.UserName, req.FileName)
 	return nil
 }
@@ -183,32 +183,32 @@ func (s *UserServices) UpdateNickName(req protocol.ReqUpdateNickName, resp *prot
 	// 校验token
 	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
-		resp.Ret = 3
+		resp.Ret = protocol.UpdateFailed
 		log.Printf("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
-		return err
+		return nil
 	}
 	if !ok {
-		resp.Ret = 1
+		resp.Ret = protocol.TokenCheckFailed
 		return nil
 	}
 	// 使 redis 对应的数据失效（由于数据将会被修改）
 	if err := redis.InvaildCache(req.UserName); err != nil {
-		resp.Ret = 3
+		resp.Ret = protocol.UpdateFailed
 		log.Printf("tcp.updateNickName: redis.InvaildCache failed. username:%s, err:%q\n", req.UserName, err)
-		return err
+		return nil
 	}
 	// 写入数据库
 	ok, err = mysql.UpdateNickName(req.UserName, req.NickName)
 	if err != nil {
-		resp.Ret = 3
+		resp.Ret = protocol.UpdateFailed
 		log.Printf("tcp.updateNickName: mysql.UpdateNickName failed. username:%s, nickname:%s, err:%q\n", req.UserName, req.NickName, err)
-		return err
-	}
-	if !ok {
-		resp.Ret = 2
 		return nil
 	}
-	resp.Ret = 0
+	if !ok {
+		resp.Ret = protocol.UserNotExist
+		return nil
+	}
+	resp.Ret = protocol.Success
 	log.Printf("tcp.updateNickName done. username:%s, nickname:%s\n", req.UserName, req.NickName)
 	return nil
 }

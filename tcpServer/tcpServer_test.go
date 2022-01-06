@@ -13,7 +13,7 @@ func TestLogin(t *testing.T) {
 		resp protocol.RespLogin
 		ret  int
 	}{
-		{protocol.ReqLogin{UserName: "user0", Password: "user"}, protocol.RespLogin{}, 0},
+		{protocol.ReqLogin{UserName: "user0", Password: "user"}, protocol.RespLogin{}, protocol.Success},
 	}
 
 	for _, test := range tests {

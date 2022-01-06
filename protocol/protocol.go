@@ -1,5 +1,18 @@
 package protocol
 
+const (
+	Success                 int = 0
+	UserNameOrPasswordNull  int = 1
+	UserCreateFailed        int = 2
+	UserNameOrPasswordError int = 3
+	LoginFailed             int = 4
+	TokenCheckFailed        int = 5
+	DataIsNil               int = 6
+	GetProfileFailed        int = 7
+	UserNotExist            int = 8
+	UpdateFailed            int = 9
+)
+
 // 注册请求.
 type ReqSignUp struct {
 	UserName string // 用户名, 不为空
