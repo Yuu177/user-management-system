@@ -152,7 +152,7 @@ func UploadProfilePicture(rw http.ResponseWriter, req *http.Request) {
 // 调用远程 rpc 服务, 将数据存入到数据库
 func callSignUp(rw http.ResponseWriter, arg protocol.ReqSignUp, reply *protocol.RespSignUp) error {
 	if err := rpcClient.Call("UserServices.SignUp", arg, reply); err != nil {
-		log.Printf("http.SignUp: Call SignUp failed. username:%s, err:%q\n", arg.UserName, err)
+		log.Printf("Call signUp failed. username:%s, err:%q\n", arg.UserName, err)
 		rw.Write([]byte("创建账号失败！"))
 		return err
 	}
@@ -168,7 +168,7 @@ func handleSignUpRet(rw http.ResponseWriter, arg protocol.ReqSignUp, reply proto
 	default:
 		rw.Write([]byte("创建账号失败！"))
 	}
-	log.Printf("http.SignUp: SignUp done. username:%s, ret:%d\n", arg.UserName, reply.Ret)
+	log.Printf("SignUp done. username:%s, ret:%d\n", arg.UserName, reply.Ret)
 }
 
 func signUpReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.ReqSignUp, error) {
@@ -181,7 +181,7 @@ func signUpReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.Re
 		rw.Write([]byte("username and password couldn't be NULL!"))
 		return protocol.ReqSignUp{}, errors.New("username and password couldn't be NULL")
 	}
-	log.Printf("userName = %s, password = %s, nickName = %s\n", userName, password, nickName)
+	log.Printf("username = %s, password = %s, nickname = %s\n", userName, password, nickName)
 	arg := protocol.ReqSignUp{
 		UserName: userName,
 		Password: password,
@@ -193,7 +193,7 @@ func signUpReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.Re
 // 调用远程 rpc 服务, 主要对登陆账号密码进行验证
 func callLogin(rw http.ResponseWriter, arg protocol.ReqLogin, reply *protocol.RespLogin) error {
 	if err := rpcClient.Call("UserServices.Login", arg, &reply); err != nil {
-		log.Printf("http.Login: Call Login failed. username:%s, err:%q\n", arg.UserName, err)
+		log.Printf("Call login failed. username:%s, err:%q\n", arg.UserName, err)
 		// 重新登录
 		templateLogin(rw, LoginResponse{Msg: "登录失败！"})
 		return err
@@ -216,7 +216,7 @@ func handleLoginRet(rw http.ResponseWriter, arg protocol.ReqLogin, reply protoco
 	default:
 		templateLogin(rw, LoginResponse{Msg: "登录失败！"})
 	}
-	log.Printf("http.Login: Login done. username:%s, ret:%d\n", arg.UserName, reply.Ret)
+	log.Printf("login done. username:%s, ret:%d\n", arg.UserName, reply.Ret)
 }
 
 func loginReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.ReqLogin, error) {
@@ -239,7 +239,7 @@ func loginReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.Req
 // 调用远程 rpc 服务, 获取用户对应的信息
 func callGetProfile(rw http.ResponseWriter, arg protocol.ReqGetProfile, reply *protocol.RespGetProfile) error {
 	if err := rpcClient.Call("UserServices.GetProfile", arg, &reply); err != nil {
-		log.Printf("http.GetProfile: Call GetProfile failed. username:%s, err:%q\n", arg.UserName, err)
+		log.Printf("Call getProfile failed. username:%s, err:%q\n", arg.UserName, err)
 		// templateJump(rw, JumpResponse{Msg: "获取用户信息失败！"})
 		templateLogin(rw, LoginResponse{Msg: "用户登陆过期，请重新登陆"})
 		return err
@@ -266,7 +266,7 @@ func handleGetProfileRet(rw http.ResponseWriter, arg protocol.ReqGetProfile, rep
 	default:
 		templateJump(rw, JumpResponse{Msg: "获取用户信息失败！"})
 	}
-	log.Printf("http.GetProfile: GetProfile done. username:%s, ret:%d\n", arg.UserName, reply.Ret)
+	log.Printf("GetProfile done. username:%s, ret:%d\n", arg.UserName, reply.Ret)
 }
 
 func getProfileReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.ReqGetProfile, error) {
@@ -297,7 +297,7 @@ func getProfileReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protoco
 //调用远程 rpc 服务, 修改用户的 nickName 信息
 func callUpdateNickName(rw http.ResponseWriter, arg protocol.ReqUpdateNickName, reply *protocol.RespUpdateNickName) error {
 	if err := rpcClient.Call("UserServices.UpdateNickName", arg, &reply); err != nil {
-		log.Printf("http.UpdateNickName: Call UpdateNickName failed. username:%s, err:%q", arg.UserName, err)
+		log.Printf("Call updateNickName failed. username:%s, err:%q", arg.UserName, err)
 		templateJump(rw, JumpResponse{Msg: "修改昵称失败！"})
 		return err
 	}
@@ -316,7 +316,7 @@ func handleUpdateNickNameRet(rw http.ResponseWriter, arg protocol.ReqUpdateNickN
 		templateJump(rw, JumpResponse{Msg: "修改昵称失败！"})
 
 	}
-	log.Printf("http.UpdateNickName: UpdateNickName done. username:%s, nickname:%s, ret:%d", arg.UserName, arg.NickName, reply.Ret)
+	log.Printf("update nickname done. username:%s, nickname:%s, ret:%d", arg.UserName, arg.NickName, reply.Ret)
 }
 
 func updateNickNameReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.ReqUpdateNickName, error) {
@@ -340,7 +340,7 @@ func updateNickNameReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (pro
 // 调用远程rpc服务, 修改用户的头像 pickName 的路径
 func callUploadProfilePicture(rw http.ResponseWriter, arg protocol.ReqUpdateProfilePic, reply *protocol.RespUpdateProfilePic) error {
 	if err := rpcClient.Call("UserServices.UpdateProfilePic", arg, &reply); err != nil {
-		log.Printf("http.UploadProfilePicture: Call UploadProfilePic failed. username:%s, err:%q", arg.UserName, err)
+		log.Printf("Call uploadProfilePic failed. username:%s, err:%q", arg.UserName, err)
 		templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
 		return err
 	}
@@ -358,7 +358,7 @@ func handleUploadProfilePictureRet(rw http.ResponseWriter, arg protocol.ReqUpdat
 	default:
 		templateJump(rw, JumpResponse{Msg: "修改头像失败！"})
 	}
-	log.Printf("http.UploadProfilePicture: UploadProfilePicture done. username:%s, filepath:%s, ret:%d", arg.UserName, arg.FileName, reply.Ret)
+	log.Printf("Upload picture done. username:%s, filepath:%s, ret:%d", arg.UserName, arg.FileName, reply.Ret)
 }
 
 func uploadProfilePictureReqConvRpcArg(rw http.ResponseWriter, req *http.Request) (protocol.ReqUpdateProfilePic, error) {
@@ -398,7 +398,7 @@ func getFileName(userName string, rw http.ResponseWriter, req *http.Request) (st
 	file, head, err := req.FormFile("image")
 	if err != nil {
 		templateJump(rw, JumpResponse{Msg: "获取图片失败！"})
-		log.Printf("http.UploadProfilePicture: get file name failed. username:%s, err:%q", userName, err)
+		log.Printf("get file name failed. username:%s, err:%q", userName, err)
 		return "", errors.New("get file name failed")
 	}
 	defer file.Close()
@@ -432,20 +432,20 @@ func getFileName(userName string, rw http.ResponseWriter, req *http.Request) (st
 // http 登陆页面
 func templateLogin(rw http.ResponseWriter, reply LoginResponse) {
 	if err := loginTemplate.Execute(rw, reply); err != nil {
-		log.Printf("http.templateLogin: %q\n", err)
+		log.Printf("template login failed: %q\n", err)
 	}
 }
 
 // http 编辑页面
 func templateProfile(rw http.ResponseWriter, reply ProfileResponse) {
 	if err := profileTemplate.Execute(rw, reply); err != nil {
-		log.Printf("http.templateProfile: %q\n", err)
+		log.Printf("template profile failed: %q\n", err)
 	}
 }
 
 // http 应答信息页面
 func templateJump(rw http.ResponseWriter, reply JumpResponse) {
 	if err := jumpTemplate.Execute(rw, reply); err != nil {
-		log.Printf("http.templateJump: %q\n", err)
+		log.Printf("template jump failed: %q\n", err)
 	}
 }

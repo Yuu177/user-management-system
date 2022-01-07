@@ -8,7 +8,7 @@ const (
 	// 连接 redis 最多的连接(Maximum number of socket connections.).
 	RedisPoolSize int = 30
 	// 生存时间（token 和 cookie）
-	MaxExTime int = 30
+	MaxExTime int = 60
 
 	// 连接数据库地址.
 	MysqlDB string = "user:user@tcp(127.0.0.1:3306)/testdb01?charset=utf8&parseTime=True&loc=Local"

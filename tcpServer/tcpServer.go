@@ -33,7 +33,7 @@ func (s *UserServices) SignUp(req protocol.ReqSignUp, resp *protocol.RespSignUp)
 
 	if err := mysql.CreateUser(req.UserName, req.NickName, req.Password); err != nil {
 		resp.Ret = protocol.UserCreateFailed
-		log.Printf("tcp.signUp: mysql.CreateUser failed. usernam:%s, err:%q\n", req.UserName, err)
+		log.Printf("create user failed. usernam:%s, err:%q\n", req.UserName, err)
 		return nil
 	}
 
@@ -63,7 +63,7 @@ func (s *UserServices) Login(req protocol.ReqLogin, resp *protocol.RespLogin) er
 	// 一切正常
 	resp.Ret = protocol.Success
 	resp.Token = token
-	log.Printf("tcp.login: login done. username:%s\n", req.UserName)
+	log.Printf("login done. username:%s\n", req.UserName)
 	return nil
 }
 
@@ -71,7 +71,7 @@ func updateCache(req protocol.ReqLogin, token string) error {
 	redis.SetPassword(req.UserName, req.Password)
 	err := redis.SetToken(req.UserName, token, int64(config.MaxExTime))
 	if err != nil {
-		log.Printf("tcp.login: redis.SetToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, token, err)
+		log.Printf("redis set token failed. usernam:%s, token:%s, err:%q\n", req.UserName, token, err)
 		return nil
 	}
 	return nil
@@ -88,7 +88,7 @@ func loginAuth(req protocol.ReqLogin) (bool, error) {
 	// 如果 redis 不通过（redis 中没有数据或者数据有问题），再从 mysql 中查看
 	ok, err := mysql.LoginAuth(req.UserName, req.Password)
 	if err != nil {
-		log.Printf("tcp.login: mysql.LoginAuth failed. username:%s, err:%q\n", req.UserName, err)
+		log.Printf("mysql login auth failed. username:%s, err:%q\n", req.UserName, err)
 		return false, nil
 	}
 	return ok, nil
@@ -100,7 +100,7 @@ func (s *UserServices) GetProfile(req protocol.ReqGetProfile, resp *protocol.Res
 	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
 		resp.Ret = protocol.GetProfileFailed
-		log.Printf("tcp.getProfile: checkToken failed. usernam:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
+		log.Printf("check token failed. usernam:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
 		return nil
 	}
 	if !ok {
@@ -114,7 +114,7 @@ func (s *UserServices) GetProfile(req protocol.ReqGetProfile, resp *protocol.Res
 		return nil
 	}
 
-	log.Printf("tcp.getProfile done. username:%s\n", req.UserName)
+	log.Printf("get profile done. username:%s\n", req.UserName)
 	*resp = protocol.RespGetProfile{Ret: protocol.Success, UserName: req.UserName, NickName: userProfile.NickName, PicName: userProfile.PicName}
 	return nil
 }
@@ -124,14 +124,14 @@ func getUserProfile(req protocol.ReqGetProfile) (protocol.UserProfile, bool) {
 	userProfile, isRead := redis.GetProfile(req.UserName)
 	if isRead {
 		// redis 中读取到数据
-		log.Printf("redis tcp.getProfile done. username:%s\n", req.UserName)
+		log.Printf("redis get profile done. username:%s\n", req.UserName)
 		return userProfile, true
 	}
 
 	// redis 没有读取到数据，从 mysql 里取
 	userProfile, isRead = mysql.GetProfile(req.UserName)
 	if !isRead {
-		log.Printf("mysql tcp.getProfile: mysql.GetProfile failed. username:%s\n", req.UserName)
+		log.Printf("mysql get profile failed. username:%s\n", req.UserName)
 		return protocol.UserProfile{}, false
 	}
 
@@ -147,7 +147,7 @@ func (s *UserServices) UpdateProfilePic(req protocol.ReqUpdateProfilePic, resp *
 	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
 		resp.Ret = protocol.UpdateFailed
-		log.Printf("tcp.updateProfilePic: checkToken failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
+		log.Printf("check token failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
 		return nil
 	}
 	if !ok {
@@ -158,7 +158,7 @@ func (s *UserServices) UpdateProfilePic(req protocol.ReqUpdateProfilePic, resp *
 	// 使 redis 对应的数据失效（由于数据将会被修改）
 	if err := redis.InvaildCache(req.UserName); err != nil {
 		resp.Ret = protocol.UpdateFailed
-		log.Printf("tcp.updateProfilePic: redis.InvaildCache failed. username:%s, err:%q\n", req.UserName, err)
+		log.Printf("redis invaild cache failed. username:%s, err:%q\n", req.UserName, err)
 		return nil
 	}
 
@@ -166,7 +166,7 @@ func (s *UserServices) UpdateProfilePic(req protocol.ReqUpdateProfilePic, resp *
 	ok, err = mysql.UpdateProfilePic(req.UserName, req.FileName)
 	if err != nil {
 		resp.Ret = protocol.UpdateFailed
-		log.Printf("tcp.updateProfilePic: mysql.UpdateProfilePic failed. username:%s, filename:%s, err:%q\n", req.UserName, req.FileName, err)
+		log.Printf("mysql update profilePic failed. username:%s, filename:%s, err:%q\n", req.UserName, req.FileName, err)
 		return nil
 	}
 	if !ok {
@@ -174,7 +174,7 @@ func (s *UserServices) UpdateProfilePic(req protocol.ReqUpdateProfilePic, resp *
 		return nil
 	}
 	resp.Ret = protocol.Success
-	log.Printf("tcp.updateProfilePic done. username:%s, filename:%s\n", req.UserName, req.FileName)
+	log.Printf("update profilePic done. username:%s, filename:%s\n", req.UserName, req.FileName)
 	return nil
 }
 
@@ -184,7 +184,7 @@ func (s *UserServices) UpdateNickName(req protocol.ReqUpdateNickName, resp *prot
 	ok, err := checkToken(req.UserName, req.Token)
 	if err != nil {
 		resp.Ret = protocol.UpdateFailed
-		log.Printf("tcp.updateNickName: checkToken failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
+		log.Printf("check token failed. username:%s, token:%s, err:%q\n", req.UserName, req.Token, err)
 		return nil
 	}
 	if !ok {
@@ -194,14 +194,14 @@ func (s *UserServices) UpdateNickName(req protocol.ReqUpdateNickName, resp *prot
 	// 使 redis 对应的数据失效（由于数据将会被修改）
 	if err := redis.InvaildCache(req.UserName); err != nil {
 		resp.Ret = protocol.UpdateFailed
-		log.Printf("tcp.updateNickName: redis.InvaildCache failed. username:%s, err:%q\n", req.UserName, err)
+		log.Printf("redis invaild cache failed. username:%s, err:%q\n", req.UserName, err)
 		return nil
 	}
 	// 写入数据库
 	ok, err = mysql.UpdateNickName(req.UserName, req.NickName)
 	if err != nil {
 		resp.Ret = protocol.UpdateFailed
-		log.Printf("tcp.updateNickName: mysql.UpdateNickName failed. username:%s, nickname:%s, err:%q\n", req.UserName, req.NickName, err)
+		log.Printf("mysql update nickName failed. username:%s, nickname:%s, err:%q\n", req.UserName, req.NickName, err)
 		return nil
 	}
 	if !ok {
@@ -209,7 +209,7 @@ func (s *UserServices) UpdateNickName(req protocol.ReqUpdateNickName, resp *prot
 		return nil
 	}
 	resp.Ret = protocol.Success
-	log.Printf("tcp.updateNickName done. username:%s, nickname:%s\n", req.UserName, req.NickName)
+	log.Printf("update nickName done. username:%s, nickname:%s\n", req.UserName, req.NickName)
 	return nil
 }
 
