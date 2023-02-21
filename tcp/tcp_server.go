@@ -2,12 +2,12 @@ package main
 
 import (
 	"log"
-	"userSystem/config"
-	"userSystem/mysql"
-	"userSystem/protocol"
-	"userSystem/redis"
-	"userSystem/rpc"
-	"userSystem/utils"
+	"user-management-system/config"
+	"user-management-system/mysql"
+	"user-management-system/protocol"
+	"user-management-system/redis"
+	"user-management-system/rpc"
+	tk "user-management-system/utils/token"
 )
 
 type UserServices struct{}
@@ -53,7 +53,7 @@ func (s *UserServices) Login(req protocol.ReqLogin, resp *protocol.RespLogin) er
 		return nil
 	}
 	// 登陆成功，更新 redis 中的数据
-	token := utils.GetToken(req.UserName)
+	token := tk.GetToken(req.UserName)
 	err = updateCache(req, token)
 	if err != nil {
 		resp.Ret = protocol.LoginFailed

@@ -33,7 +33,7 @@ func Client(connections int, address string) (RPCClient, error) {
 func (r *RPCClient) call(serviceMethod string, arg interface{}, reply interface{}) (err error) {
 	// 从连接池获取一个空闲连接.
 	conn := r.getConn()
-	defer r.releaseConn(conn)
+	defer r.releaseConn(conn) // TODO 服务端关闭连接后，客户端这个连接还能用吗？
 
 	cc := NewGobCodec(conn)
 	var h = &Header{
@@ -41,7 +41,7 @@ func (r *RPCClient) call(serviceMethod string, arg interface{}, reply interface{
 		Error:         "",
 	}
 
-	// 将数据编码并发送到rpc服务器，然后等待接收
+	// 将数据编码并发送到 rpc 服务器，然后等待接收
 	if err = cc.Write(h, arg); err != nil {
 		return err
 	}

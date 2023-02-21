@@ -88,13 +88,12 @@ func (s *Server) readRequest(cc Codec) (*request, error) {
 var invalidRequest = struct{}{}
 
 func (s *Server) handleRequest(cc Codec, req *request) error {
-	// 通过request 我们知道了：结构体，方法，入参，出参
+	// 通过 request 我们知道了：结构体，方法，入参，出参
 	err := req.svc.call(req.mtype, req.arg, req.reply)
 	return err
 }
 
 func (s *Server) sendResponse(cc Codec, h *Header, body interface{}) {
-
 	if err := cc.Write(h, body); err != nil {
 		log.Println("rpc server: write response error:", err)
 	}
@@ -105,8 +104,8 @@ func (s *Server) serveConn(conn net.Conn) {
 		log.Println("conn is nil")
 		return
 	}
-	for {
-		// 每次来新的连接就new 一个 codec，因为 codec 的 conn 不一样
+	for { // TODO 这里 for 循环好像有点问题
+		// 每次来新的连接就 new 一个 codec，因为 codec 的 conn 不一样
 		cc := NewGobCodec(conn)
 		req, err := s.readRequest(cc)
 		if err != nil {
@@ -136,8 +135,8 @@ func (s *Server) acceptAndServeConn(listener net.Listener) error {
 		if err != nil {
 			return err
 		}
-		defer conn.Close()
-		go s.serveConn(conn)
+		defer conn.Close()   // TODO 客户端用的连接池，如果服务端 close 会怎么样？
+		go s.serveConn(conn) // 多协程处理请求
 	}
 }
 

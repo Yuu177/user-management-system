@@ -8,10 +8,11 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"text/template"
-	"userSystem/config"
-	"userSystem/protocol"
-	"userSystem/rpc"
-	"userSystem/utils"
+	"user-management-system/config"
+	"user-management-system/protocol"
+	"user-management-system/rpc"
+	"user-management-system/utils/filename"
+
 )
 
 // 模版参数
@@ -59,18 +60,21 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(config.StaticFilePath))))
 
 	// 注册 http 请求对应的处理函数
-	// http.HandleFunc("/", GetProfile) 如果路由为 / 那么其他的 /abcd 请求也会到这里
+	// 如果路由为 / 那么其他的 /abcd 请求也会到这里
+	http.HandleFunc("/", GetProfile)
 	http.HandleFunc("/index", GetProfile)
-	http.HandleFunc("/signUp", SignUp)
+	http.HandleFunc("/signup", SignUp)
 	http.HandleFunc("/login", Login)
 	http.HandleFunc("/profile", GetProfile)
-	http.HandleFunc("/updateNickName", UpdateNickName)
-	http.HandleFunc("/uploadFile", UploadProfilePicture)
+	http.HandleFunc("/updatenickname", UpdateNickName)
+	http.HandleFunc("/uploadfile", UploadProfilePicture)
 
+	// 当我们使用 http.ListenAndServe() 函数来启动一个 HTTP 服务时，每当有一个请求到达服务器时，
+	// 服务器会启动一个新的 goroutine 来处理该请求，因此在处理某个请求时，如果另一个请求到达，
+	// 它将会被分配到一个新的 goroutine 中处理，两个请求将会并行处理。
 	http.ListenAndServe(config.HTTPServerAddr, nil)
 }
 
-// ============================ /
 // 注册账号
 func SignUp(rw http.ResponseWriter, req *http.Request) {
 	// 处理 http post方法
@@ -146,8 +150,6 @@ func UploadProfilePicture(rw http.ResponseWriter, req *http.Request) {
 		handleUploadProfilePictureRet(rw, arg, reply)
 	}
 }
-
-// =============================== //
 
 // 调用远程 rpc 服务, 将数据存入到数据库
 func callSignUp(rw http.ResponseWriter, arg protocol.ReqSignUp, reply *protocol.RespSignUp) error {
@@ -404,7 +406,7 @@ func getFileName(userName string, rw http.ResponseWriter, req *http.Request) (st
 	defer file.Close()
 
 	// 检测文件合法性，并且随机生成一个文件名，拷贝 newName
-	newName, isLegal := utils.CheckAndCreateFileName(head.Filename)
+	newName, isLegal := filename.CheckAndCreateFileName(head.Filename)
 	if !isLegal {
 		templateJump(rw, JumpResponse{Msg: "文件格式不合法！"})
 		return "", errors.New("文件格式不合法！")

@@ -3,9 +3,9 @@ package mysql
 import (
 	"errors"
 	"log"
-	"userSystem/config"
-	"userSystem/protocol"
-	"userSystem/utils"
+	"user-management-system/config"
+	"user-management-system/protocol"
+	"user-management-system/utils/encryption"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -36,14 +36,13 @@ func init() {
 	// 自动建表
 	db.AutoMigrate(&protocol.User{})
 	db.AutoMigrate(&protocol.UserProfile{})
-
 }
 
 // 创建账号。往 user 表插入信息
 func insertUser(userName string, password string) error {
 	var user protocol.User
 	user.UserName = userName
-	user.Password = utils.MD5(password)
+	user.Password = encryption.MD5(password)
 	if err := db.Create(&user).Error; err != nil {
 		log.Println("插入失败", err)
 		return err
@@ -77,7 +76,7 @@ func CreateUser(userName, nickName, password string) (err error) {
 func LoginAuth(userName string, password string) (bool, error) {
 	var user protocol.User
 	db.Where("user_name = ?", userName).First(&user)
-	pwd := utils.MD5(password)
+	pwd := encryption.MD5(password)
 	if user.Password == pwd {
 		return true, nil
 	}

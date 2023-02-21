@@ -2,7 +2,7 @@ package main
 
 import (
 	"testing"
-	"userSystem/protocol"
+	"user-management-system/protocol"
 )
 
 var servicesTest UserServices

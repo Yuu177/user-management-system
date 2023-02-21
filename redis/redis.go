@@ -3,9 +3,9 @@ package redis
 import (
 	"log"
 	"time"
-	"userSystem/config"
-	"userSystem/protocol"
-	"userSystem/utils"
+	"user-management-system/config"
+	"user-management-system/protocol"
+	"user-management-system/utils/encryption"
 
 	"github.com/go-redis/redis"
 )
@@ -61,14 +61,14 @@ func LoginAuth(userName string, password string) bool {
 	if err != nil {
 		return false
 	}
-	if pwd == utils.MD5(password) {
+	if pwd == encryption.MD5(password) {
 		return true
 	}
 	return false
 }
 
 func SetPassword(userName string, password string) {
-	set(userName+"_pwd", utils.MD5(password), int64(config.MaxExTime))
+	set(userName+"_pwd", encryption.MD5(password), int64(config.MaxExTime))
 }
 
 // 获取用户信息
